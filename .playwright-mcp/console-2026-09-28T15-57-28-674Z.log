@@ -1,0 +1,10 @@
+[     224ms] [ERROR] Refused to execute script from 'https://hack2skill.com/event/codeforcommunities2/js/gt.min.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ https://hack2skill.com/event/codeforcommunities2/?sectionid=6a7aeec965fbd7acf70c1764:0
+[     650ms] [LOG] undefined @ https://hack2skill.com/assets/index-afaf2031.js:1000
+[     656ms] [LOG] undefined @ https://hack2skill.com/assets/index-afaf2031.js:828
+[     676ms] [LOG] 🔍 Checking for existing cookie consent... @ https://hack2skill.com/assets/index-afaf2031.js:1127
+[     676ms] [LOG] ❌ Cookie not found: cookie_consent @ https://hack2skill.com/assets/index-afaf2031.js:1127
+[     676ms] [LOG] ❌ Cookie not found: cookie_consent_ts @ https://hack2skill.com/assets/index-afaf2031.js:1127
+[     676ms] [LOG] ❌ No consent found, will show modal @ https://hack2skill.com/assets/index-afaf2031.js:1127
+[     762ms] [LOG] undefined @ https://hack2skill.com/assets/index-afaf2031.js:828
+[     778ms] [LOG] undefined @ https://hack2skill.com/assets/index-afaf2031.js:828
+[    2655ms] [LOG] undefined @ https://hack2skill.com/assets/index-afaf2031.js:828

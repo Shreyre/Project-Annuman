@@ -1,0 +1,45 @@
+{
+  "version": "seed-0",
+  "source_note": "DEVELOPMENT SEED, hand-authored. Doses are typical adult regimens and are NOT verified against ICMR STWs / NHSRC STGs; citations are empty on purpose. Replace with the Gemini-compiled grammar from grammar/compile_crg.py before any demo claim.",
+  "drugs": {
+    "paracetamol_500": {"unit": "tab"},
+    "amoxicillin_500": {"unit": "cap"},
+    "cotrimoxazole_480": {"unit": "tab"},
+    "ors_sachet": {"unit": "sachet"},
+    "zinc_20": {"unit": "tab"},
+    "amlodipine_5": {"unit": "tab"},
+    "telmisartan_40": {"unit": "tab"},
+    "metformin_500": {"unit": "tab"},
+    "glimepiride_1": {"unit": "tab"},
+    "nitrofurantoin_100": {"unit": "cap"},
+    "ifa_tab": {"unit": "tab"}
+  },
+  "conditions": {
+    "fever": {"courses": [
+      {"drug": "paracetamol_500", "share": 0.95, "units_per_day": 3, "days": 3, "substitutes": [], "citation": null}
+    ]},
+    "pneumonia": {"courses": [
+      {"drug": "amoxicillin_500", "share": 0.9, "units_per_day": 3, "days": 5,
+       "substitutes": [{"drug": "cotrimoxazole_480", "units_per_day": 4, "days": 5}], "citation": null}
+    ]},
+    "acute_diarrhoea": {"courses": [
+      {"drug": "ors_sachet", "share": 0.95, "units_per_day": 2, "days": 3, "substitutes": [], "citation": null},
+      {"drug": "zinc_20", "share": 0.6, "units_per_day": 1, "days": 14, "substitutes": [], "citation": null}
+    ]},
+    "hypertension": {"courses": [
+      {"drug": "amlodipine_5", "share": 0.85, "units_per_day": 1, "days": 30,
+       "substitutes": [{"drug": "telmisartan_40", "units_per_day": 1, "days": 30}], "citation": null}
+    ]},
+    "type2_diabetes": {"courses": [
+      {"drug": "metformin_500", "share": 0.9, "units_per_day": 2, "days": 30,
+       "substitutes": [{"drug": "glimepiride_1", "units_per_day": 1, "days": 30}], "citation": null}
+    ]},
+    "uti": {"courses": [
+      {"drug": "nitrofurantoin_100", "share": 0.8, "units_per_day": 2, "days": 5,
+       "substitutes": [{"drug": "cotrimoxazole_480", "units_per_day": 4, "days": 3}], "citation": null}
+    ]},
+    "anaemia_pregnancy": {"courses": [
+      {"drug": "ifa_tab", "share": 0.95, "units_per_day": 1, "days": 30, "substitutes": [], "citation": null}
+    ]}
+  }
+}

@@ -1,0 +1,490 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - img "Your Company" [ref=e8] [cursor=pointer]
+          - generic [ref=e10]:
+            - link "Select Language" [ref=e16] [cursor=pointer]:
+              - /url: "#"
+              - generic [aria-hidden] [ref=e18]: ▼
+            - paragraph [ref=e19] [cursor=pointer]: Home
+            - paragraph [ref=e20] [cursor=pointer]: Blogs
+            - paragraph [ref=e21] [cursor=pointer]: Organize Initiative
+            - paragraph [ref=e22] [cursor=pointer]: My Dashboard
+        - link "Login/Register" [ref=e28] [cursor=pointer]:
+          - /url: /login
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - paragraph
+          - paragraph
+        - generic [ref=e38] [cursor=pointer]: Logout
+    - main [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e47]:
+          - paragraph [ref=e51]: build-with-ai-india@googlegroups.com
+          - img "Event banner" [ref=e58]
+        - generic [ref=e61]:
+          - generic [ref=e66]:
+            - paragraph [ref=e68]: "Build with AI: Code for Communities — Second Edition"
+            - generic [ref=e69]:
+              - paragraph [ref=e73]: Hybrid
+              - paragraph [ref=e77]: "Team Size: 1-4"
+              - paragraph [ref=e81]: Free
+          - generic [ref=e82]:
+            - generic [ref=e84] [cursor=pointer]
+            - generic [ref=e92]:
+              - paragraph [ref=e93]: Last Date to Register
+              - paragraph [ref=e94]: Wed 30 Sep 2026
+            - link "Register Now" [ref=e96] [cursor=pointer]:
+              - /url: /login
+        - generic [ref=e100]:
+          - button "Scroll left" [ref=e101] [cursor=pointer]
+          - generic [ref=e104]:
+            - button "Overview" [ref=e105] [cursor=pointer]
+            - button "Why participate" [ref=e106] [cursor=pointer]
+            - button "Who can participate" [ref=e107] [cursor=pointer]
+            - button "Problem statements" [ref=e108] [cursor=pointer]
+            - button "What to build & what to submit" [ref=e109] [cursor=pointer]
+            - button "Timeline" [ref=e110] [cursor=pointer]
+            - button "In-person demo day" [ref=e111] [cursor=pointer]
+            - button "Mentorship & support" [ref=e112] [cursor=pointer]
+            - button "Attend a GDG" [ref=e113] [cursor=pointer]
+            - button "Rules & Guidelines" [ref=e114] [cursor=pointer]
+            - button "FAQs" [ref=e115] [cursor=pointer]
+          - button "Scroll right" [ref=e116] [cursor=pointer]
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e123]: Overview
+              - generic [ref=e128]:
+                - paragraph [ref=e129]:
+                  - strong [ref=e130]: "Build with AI: Code for Communities"
+                  - text: is a Google Cloud hackathon that brings together developers from across India to build AI-powered solutions for the challenges that matter most, right here at home. Healthcare supply chains. Climate resilience. Food security. Digital public infrastructure. Problems India's own cities, states, and communities face every day — and need builders to help solve.
+                - paragraph [ref=e131]:
+                  - text: "This hackathon is built around one theme:"
+                  - strong [ref=e132]: solving for India
+                  - text: . Solutions designed by Indian developers, for Indian problems, at Indian scale.
+                - paragraph [ref=e133]:
+                  - text: The in-person Demo Day will happen in
+                  - strong [ref=e134]: October
+                  - text: . More details will be shared with shortlisted teams.
+            - generic [ref=e136]:
+              - generic [ref=e137]: Why participate
+              - generic [ref=e141]:
+                - heading "Your solution could go national." [level=2] [ref=e142]
+                - generic [ref=e143]:
+                  - generic [ref=e144]:
+                    - heading "You'll present to the people who matter." [level=3] [ref=e149]
+                    - paragraph [ref=e150]: Winning teams will showcase their solutions in person to industry experts.
+                  - generic [ref=e151]:
+                    - heading "Mentorship at scale." [level=3] [ref=e156]
+                    - paragraph [ref=e157]: GDG India's network hosts technical bootcamps and skilling sprints across cities before submissions close — in-person sessions on Google Cloud AI tools & technologies.
+                  - generic [ref=e158]:
+                    - heading "Google Cloud credits for top teams." [level=3] [ref=e162]
+                    - paragraph [ref=e163]: Top teams will receive GCP credits so that you're focused on building, not worrying about infrastructure.
+                - generic [ref=e164]:
+                  - generic [ref=e172]:
+                    - heading "Cash prize pool:" [level=3] [ref=e173]
+                    - paragraph [ref=e174]: INR 10 lakhs
+                  - paragraph [ref=e184]: A network that extends beyond the hackathon.
+            - generic [ref=e186]:
+              - generic [ref=e187]: Who can participate
+              - generic [ref=e192]:
+                - generic [ref=e201]:
+                  - heading "Open to:" [level=3] [ref=e202]
+                  - paragraph [ref=e203]: developers, AI/ML practitioners, product thinkers, freelancers — students, professionals across India, and startups
+                - generic [ref=e212]:
+                  - heading "Team size:" [level=3] [ref=e213]
+                  - paragraph [ref=e214]: up to 4 members per team
+                - generic [ref=e221]:
+                  - heading "Cost:" [level=3] [ref=e222]
+                  - paragraph [ref=e223]: free to register
+                - paragraph [ref=e231]: Solo registrants are also welcome
+            - generic [ref=e233]:
+              - generic [ref=e234]: Problem statements
+              - generic [ref=e239]:
+                - generic [ref=e240]:
+                  - 'radio "01 AI for Digital Public Infrastructure & Governance Theme: Innovation" [checked]'
+                  - generic [ref=e241] [cursor=pointer]:
+                    - generic [ref=e242]: "01"
+                    - generic [ref=e243]:
+                      - generic [ref=e244]: AI for Digital Public Infrastructure & Governance
+                      - generic [ref=e245]: "Theme: Innovation"
+                  - generic [ref=e250]:
+                    - generic [ref=e251]:
+                      - generic [ref=e252]: The Problem
+                      - paragraph [ref=e253]: Governments across India struggle to consolidate citizen feedback and align it with national infrastructure priorities. Development requests live in fragmented systems, leading to misaligned public spending, unaddressed infrastructure gaps, and no way to measure the impact of large-scale digital public infrastructure initiatives.
+                    - generic [ref=e254]:
+                      - generic [ref=e255]: The Challenge
+                      - paragraph [ref=e256]: Build a scalable, multilingual AI platform — designed as a Digital Public Good — that aggregates citizen development requests via voice, text, and messaging apps across diverse linguistic regions of India. The system should analyse large datasets combining citizen feedback with national demographic data, infrastructure indices, and public investment plans, surfacing demand hotspots and recommending high-priority development projects to national policymakers.
+                - generic [ref=e257]:
+                  - 'radio "02 Clean Air & Climate Resilience Theme: Sustainability"'
+                  - generic [ref=e258] [cursor=pointer]:
+                    - generic [ref=e259]: "02"
+                    - generic [ref=e260]:
+                      - generic [ref=e261]: Clean Air & Climate Resilience
+                      - generic [ref=e262]: "Theme: Sustainability"
+                  - generic [ref=e266]:
+                    - generic [ref=e267]:
+                      - generic [ref=e268]: The Problem
+                      - paragraph [ref=e269]: Major Indian cities monitor macro-level air quality but consistently miss hyper-local pollution events — industrial emissions, large-scale agricultural burning, seasonal smog. The absence of real-time, granular data prevents coordinated climate action and directly threatens public health.
+                    - generic [ref=e270]:
+                      - generic [ref=e271]: The Challenge
+                      - paragraph [ref=e272]: Build an AI-powered, federated climate action platform that combines citizen-sourced data (photos, local sensor readings) with satellite imagery and meteorological data. It should detect hidden pollution hotspots, forecast air quality spikes across major economic corridors, and alert relevant authorities for rapid intervention — designed for interoperability so Indian cities and states can share predictive models and coordinate resources.
+                - generic [ref=e273]:
+                  - 'radio "03 Smart Health & Supply Chain Resilience Theme: Resilience"'
+                  - generic [ref=e274] [cursor=pointer]:
+                    - generic [ref=e275]: "03"
+                    - generic [ref=e276]:
+                      - generic [ref=e277]: Smart Health & Supply Chain Resilience
+                      - generic [ref=e278]: "Theme: Resilience"
+                  - generic [ref=e282]:
+                    - generic [ref=e283]:
+                      - generic [ref=e284]: The Problem
+                      - paragraph [ref=e285]: Public healthcare systems across India face persistent supply chain vulnerabilities. The inability to track medicines, patient footfall, and resource utilisation in real time across vast networks of Primary Health Centres leads to stock-outs and limits the country's capacity to respond when it matters most.
+                    - generic [ref=e286]:
+                      - generic [ref=e287]: The Challenge
+                      - paragraph [ref=e288]: Build a federated AI platform for national-scale health resource and supply chain management — real-time visibility into medicine stocks, bed availability, and medical personnel attendance across India's entire PHC network. It should forecast demand, generate early warnings for potential stock-outs during health emergencies, and recommend automated cross-district resource redistribution, while allowing for shared predictive modelling across India's states.
+                - generic [ref=e289]:
+                  - 'radio "04 Agricultural Intelligence Theme: Cooperation"'
+                  - generic [ref=e290] [cursor=pointer]:
+                    - generic [ref=e291]: "04"
+                    - generic [ref=e292]:
+                      - generic [ref=e293]: Agricultural Intelligence
+                      - generic [ref=e294]: "Theme: Cooperation"
+                  - generic [ref=e298]:
+                    - generic [ref=e299]:
+                      - generic [ref=e300]: The Problem
+                      - paragraph [ref=e301]: Small and marginal farmers across India lack access to data-driven agricultural guidance. Relying on traditional methods instead of satellite data, soil health analytics, and climate forecasting leads to crop failure and threatens food security. The absence of shared digital infrastructure also blocks cross-state collaboration on climate-resilient farming.
+                    - generic [ref=e302]:
+                      - generic [ref=e303]: The Challenge
+                      - paragraph [ref=e304]: Build an interoperable digital agriculture network that delivers real-time, localised agro-advisories using AI. It should offer regenerative crop recommendations based on satellite data, soil health, and weather forecasting, plus a diagnostic tool for crop diseases, and be designed as a scalable digital public good enabling Indian states to share agricultural data models and strengthen cooperation on sustainable food production.
+                - generic [ref=e305]:
+                  - 'radio "05 Track-Based Cyclone Impact & Infrastructure Vulnerability Forecaster Theme: Resilience"'
+                  - generic [ref=e306] [cursor=pointer]:
+                    - generic [ref=e307]: "05"
+                    - generic [ref=e308]:
+                      - generic [ref=e309]: Track-Based Cyclone Impact & Infrastructure Vulnerability Forecaster
+                      - generic [ref=e310]: "Theme: Resilience"
+                  - generic [ref=e314]:
+                    - generic [ref=e315]:
+                      - generic [ref=e316]: The Problem
+                      - paragraph [ref=e317]: Extreme weather events in the Bay of Bengal and coastal APAC require rapid anticipatory action. Shifting disaster response from post-landfall recovery to pre-landfall evacuation planning, infrastructure hardening, and parametric insurance liquidity saves lives and livelihoods.
+                    - generic [ref=e318]:
+                      - generic [ref=e319]: The Challenge
+                      - paragraph [ref=e320]: Build an AI-powered predictive risk and vulnerability modeling platform utilizing Google Earth Engine (GEE) satellite feeds, real-time meteorological data, and Gemini 3.7 Flash's multimodal reasoning. The solution should simulate cyclone storm surges, predict local rainfall damage pathways, map exposure for critical infrastructure (power grids, arterial roads, medical shelters), and automate early-warning advisory dispatches for local municipal and disaster management authorities.
+            - generic [ref=e322]:
+              - generic [ref=e323]: What to build & what to submit
+              - generic [ref=e325]:
+                - generic [ref=e326]:
+                  - heading "Build a working prototype, not just a concept" [level=2] [ref=e327]
+                  - paragraph [ref=e328]: Your submission needs to demonstrate real, working functionality — and arrive as a complete package judges can evaluate end to end.
+                  - generic [ref=e329]:
+                    - generic [ref=e330]:
+                      - heading "Build" [level=3] [ref=e335]
+                      - paragraph [ref=e336]: "Submissions must demonstrate all of the following:"
+                      - list [ref=e337]:
+                        - listitem [ref=e338]:
+                          - generic [ref=e339]: ✓
+                          - generic [ref=e340]: A functioning end-to-end flow for your track's core use case
+                        - listitem [ref=e341]:
+                          - generic [ref=e342]: ✓
+                          - generic [ref=e343]: Mandatory integration of Google AI — GenAI, predictive modelling, or computer vision etc
+                        - listitem [ref=e344]:
+                          - generic [ref=e345]: ✓
+                          - generic [ref=e346]: Real or realistic data — public datasets, sample data, or APIs where live data isn't available
+                        - listitem [ref=e347]:
+                          - generic [ref=e348]: ✓
+                          - generic [ref=e349]: Built for India — the solution should be designed to scale across states and communities, not just a single city
+                        - listitem [ref=e350]:
+                          - generic [ref=e351]: ✓
+                          - generic [ref=e352]: Multilingual or voice support where the track calls for it
+                    - generic [ref=e353]:
+                      - heading "Submit" [level=3] [ref=e359]
+                      - paragraph [ref=e360]: "Submission package:"
+                      - list [ref=e361]:
+                        - listitem [ref=e362]:
+                          - generic [ref=e363]: "1"
+                          - generic [ref=e364]: Source code — public or access-granted GitHub repository
+                        - listitem [ref=e365]:
+                          - generic [ref=e366]: "2"
+                          - generic [ref=e367]: Demo video (3–5 minutes) — working end-to-end walkthrough
+                        - listitem [ref=e368]:
+                          - generic [ref=e369]: "3"
+                          - generic [ref=e370]: Pitch deck (10–12 slides) — problem, solution, AI approach, who it serves, why it's deployable, how it scales across India
+                        - listitem [ref=e371]:
+                          - generic [ref=e372]: "4"
+                          - generic [ref=e373]: Brief description — small description of your solution in 2-3 lines
+                        - listitem [ref=e374]:
+                          - generic [ref=e375]: "5"
+                          - generic [ref=e376]: Deployed link — A live deployed link of your prototype
+                - generic [ref=e377]:
+                  - heading "Tools & tech to build with" [level=2] [ref=e378]
+                  - paragraph [ref=e379]: "All solutions must integrate Google AI. The following are recommended and fully supported:"
+                  - generic [ref=e380]:
+                    - generic [ref=e385]:
+                      - heading "Generative AI & agents" [level=4] [ref=e386]
+                      - paragraph [ref=e387]: Gemini API, Google AI Studio, Vertex AI
+                    - generic [ref=e393]:
+                      - heading "Predictive modelling" [level=4] [ref=e394]
+                      - paragraph [ref=e395]: Vertex AI (AutoML, custom training, model serving)
+                    - generic [ref=e401]:
+                      - heading "Vision & multimodal" [level=4] [ref=e402]
+                      - paragraph [ref=e403]: Gemini multimodal, Vertex AI Vision (for citizen photo analysis, crop disease detection, pollution monitoring)
+                    - generic [ref=e409]:
+                      - heading "Language & voice" [level=4] [ref=e410]
+                      - paragraph [ref=e411]: Cloud Speech-to-Text and Text-to-Speech, Translation API, Dialogflow (for multilingual and voice-first interfaces across India's linguistic regions)
+                    - generic [ref=e417]:
+                      - heading "Geospatial" [level=4] [ref=e418]
+                      - paragraph [ref=e419]: Google Maps Platform, Google Earth Engine (for satellite imagery in climate and agriculture tracks)
+                    - generic [ref=e426]:
+                      - heading "Data & backend" [level=4] [ref=e427]
+                      - paragraph [ref=e428]: BigQuery (for large-scale national datasets), Firebase (auth, real-time DB, rapid prototyping), Cloud Run / Cloud Functions
+                    - generic [ref=e434]:
+                      - heading "Public data" [level=4] [ref=e435]
+                      - paragraph [ref=e436]: data.gov.in and Indian government open data portals, FAO agricultural datasets, WHO health data, ISRO/Bhuvan satellite data, IMD and national meteorological services
+                  - paragraph [ref=e437]: "Organizers: confirm Google AI Studio and Vertex AI credit details for registered teams."
+                - generic [ref=e438]:
+                  - heading "Evaluation parameters" [level=2] [ref=e439]
+                  - paragraph [ref=e440]: Submissions will be judged across five criteria, ranked here by weight.
+                  - generic [ref=e441]:
+                    - generic [ref=e442]:
+                      - generic [ref=e443]:
+                        - generic [ref=e444]: 20%
+                        - heading "Problem-Solution Fit" [level=4] [ref=e445]
+                        - paragraph [ref=e446]: Does it directly and specifically address the stated challenge?
+                        - generic [ref=e447]: +
+                      - generic [ref=e448]:
+                        - generic [ref=e449]: 25%
+                        - heading "AI/Technical Execution" [level=4] [ref=e450]
+                        - paragraph [ref=e451]: Is Google AI doing meaningful work? Does the prototype function end-to-end?
+                        - generic [ref=e452]: +
+                      - generic [ref=e453]:
+                        - generic [ref=e454]: 20%
+                        - heading "Depth & Reach Across India" [level=4] [ref=e455]
+                        - paragraph [ref=e456]: Can this realistically scale from one city or state to communities across India?
+                        - generic [ref=e457]: +
+                    - generic [ref=e458]:
+                      - generic [ref=e459]:
+                        - generic [ref=e460]: 15%
+                        - heading "Impact Potential" [level=4] [ref=e461]
+                        - paragraph [ref=e462]: Scale of benefit — how many people, across how many states, how meaningfully?
+                        - generic [ref=e463]: +
+                      - generic [ref=e464]:
+                        - generic [ref=e465]: 20%
+                        - heading "Deployability & Scalability" [level=4] [ref=e466]
+                        - paragraph [ref=e467]: Could this be piloted within a ministry or across states in weeks?
+                        - generic [ref=e468]: +
+            - generic [ref=e470]:
+              - generic [ref=e471]: Timeline
+              - generic [ref=e477]:
+                - generic [ref=e487]:
+                  - generic [ref=e488]: 11/08/2026 (Tuesday)
+                  - generic [ref=e489]: Launch
+                  - paragraph [ref=e490]: "Duration: 1 day."
+                - generic [ref=e500]:
+                  - generic [ref=e501]: 11/08/2026 (Tuesday) – 30/09/2026 (Wednesday)
+                  - generic [ref=e502]: Registration Phase
+                  - paragraph [ref=e503]: "Duration: 51 days."
+                - generic [ref=e513]:
+                  - generic [ref=e514]: 11/08/2026 (Tuesday) – 30/09/2026 (Wednesday)
+                  - generic [ref=e515]: Team Formation
+                  - paragraph [ref=e516]: "Duration: 51 days."
+                - generic [ref=e524]:
+                  - generic [ref=e525]: 14/08/2026 (Friday)
+                  - generic [ref=e526]: Introductory & Problem Statement Explainer Session
+                  - paragraph [ref=e527]: "Duration: 1 day."
+                - generic [ref=e534]:
+                  - generic [ref=e535]: 10/08/2026 (Monday) – 30/09/2026 (Wednesday)
+                  - generic [ref=e536]: Prototype Submission Phase
+                  - paragraph [ref=e537]: "Duration: 52 days."
+                - generic [ref=e546]:
+                  - generic [ref=e547]: 01/10/2026 (Thursday) – 15/10/2026 (Thursday)
+                  - generic [ref=e548]: Prototype Evaluation Phase
+                  - paragraph [ref=e549]: "Duration: 15 days."
+                - generic [ref=e559]:
+                  - generic [ref=e560]: 16/10/2026 (Friday)
+                  - generic [ref=e561]: Top 20 Shortlist Announcement
+                  - paragraph [ref=e562]: "Duration: 1 day."
+                - generic [ref=e568]:
+                  - generic [ref=e569]: 23/10/2026 (Friday)
+                  - generic [ref=e570]: Virtual Demo Day
+                  - paragraph [ref=e571]: "Duration: 1 day."
+            - generic [ref=e573]:
+              - generic [ref=e574]: In-person demo day
+              - generic [ref=e579]:
+                - generic [ref=e584]:
+                  - generic [ref=e585]: Date
+                  - generic [ref=e586]: TBA
+                - generic [ref=e593]:
+                  - generic [ref=e594]: Venue
+                  - generic [ref=e595]: TBA
+            - generic [ref=e598]:
+              - generic [ref=e599]: Mentorship & support
+              - generic [ref=e603]:
+                - heading "You won't be building this alone." [level=2] [ref=e604]
+                - paragraph [ref=e605]:
+                  - strong [ref=e606]: GDG Skilling Sprints
+                  - text: — in-person weekend bootcamps hosted across multiple cities by GDG India, covering several Google Cloud AI tools & technologies.
+            - generic [ref=e608]:
+              - generic [ref=e609]: Attend a GDG
+              - generic [ref=e614]:
+                - heading "Attend a GDG in-person workshop in a city near you" [level=2] [ref=e620]
+                - paragraph [ref=e621]: Before you build, get hands-on. GDG chapters across India are hosting in-person workshops and skilling sprints on Google Cloud AI tools — Gemini, Vertex AI, and more — to help you walk into the hackathon ready to build, not just ready to register.
+                - generic [ref=e622]:
+                  - paragraph [ref=e628]: Find the GDG chapter closest to you and reserve your spot before workshops fill up.
+                  - paragraph [ref=e633]: Sessions are hands-on and beginner-friendly, run by local Google Developer Experts.
+                  - paragraph [ref=e638]: Can't find a workshop in your city? Look for a nearby city.
+                - paragraph [ref=e643]:
+                  - strong [ref=e644]: City-wise workshop schedules
+                  - text: will be published later in August — keep an eye on the website and your registered email address.
+            - generic [ref=e646]:
+              - generic [ref=e647]: Rules & Guidelines
+              - generic [ref=e652]:
+                - generic [ref=e653]:
+                  - generic [ref=e654]: "01"
+                  - generic [ref=e655]:
+                    - text: All solutions must integrate
+                    - strong [ref=e656]: Google AI
+                    - text: — GenAI, predictive modelling, or computer vision. Submissions without Google AI integration will not be considered.
+                - generic [ref=e657]:
+                  - generic [ref=e658]: "02"
+                  - generic [ref=e659]:
+                    - text: Teams must
+                    - strong [ref=e660]: build during the hackathon period
+                    - text: . Pre-existing projects are not eligible unless substantially extended for this challenge.
+                - generic [ref=e661]:
+                  - generic [ref=e662]: "03"
+                  - generic [ref=e663]:
+                    - text: All code must be
+                    - strong [ref=e664]: original
+                    - text: or built on properly licensed open-source components — cite anything you reuse.
+                - generic [ref=e665]:
+                  - generic [ref=e666]: "04"
+                  - generic [ref=e667]:
+                    - text: Solutions should be designed with
+                    - strong [ref=e668]: cross-border applicability
+                    - text: in mind — built for one context but scalable to others across BRICS nations.
+                - generic [ref=e669]:
+                  - generic [ref=e670]: "05"
+                  - generic [ref=e671]:
+                    - strong [ref=e672]: Respectful, inclusive conduct
+                    - text: is expected at all times.
+                - generic [ref=e673]:
+                  - generic [ref=e674]: "06"
+                  - strong [ref=e676]: Judges' decisions are final.
+            - generic [ref=e678]:
+              - generic [ref=e679]: FAQs
+              - generic [ref=e682]:
+                - group [ref=e683] [cursor=pointer]:
+                  - paragraph [ref=e689]: No. Pick the track that matches your skills and interests. Domain context, ground-level briefs, and mentorship will be provided throughout. You need to be able to build — the policy context is something you'll absorb as you go.
+                - group [ref=e690] [cursor=pointer]
+                - group [ref=e695] [cursor=pointer]
+                - group [ref=e700] [cursor=pointer]
+                - group [ref=e705] [cursor=pointer]
+                - group [ref=e710] [cursor=pointer]
+                - group [ref=e715] [cursor=pointer]
+                - group [ref=e720] [cursor=pointer]
+            - button "*Initiative Terms & Conditions" [ref=e727] [cursor=pointer]
+          - generic [ref=e731]:
+            - generic [ref=e732]:
+              - link [ref=e733] [cursor=pointer]:
+                - /url: https://www.facebook.com/hack2skill/
+              - link [ref=e736] [cursor=pointer]:
+                - /url: https://www.instagram.com/hack2skill/
+              - link [ref=e739] [cursor=pointer]:
+                - /url: https://twitter.com/hack2skill
+              - link [ref=e742] [cursor=pointer]:
+                - /url: https://www.linkedin.com/company/hack2skill/mycompany/
+              - link [ref=e745] [cursor=pointer]:
+                - /url: https://discord.com/invite/KMKtbxBJpW
+              - link [ref=e748] [cursor=pointer]:
+                - /url: https://www.youtube.com/channel/UCw2br80x_dpvJoAsSCC-bGA
+            - paragraph [ref=e751]: "Build with AI: Code for Communities — Second Edition"
+            - generic [ref=e757]:
+              - paragraph [ref=e758]: Last Date to Register
+              - paragraph [ref=e759]: Wed 30 Sep 2026
+            - generic [ref=e760]:
+              - paragraph [ref=e761]: Registration Closes In
+              - paragraph [ref=e762]: 2d:2h:31m
+            - generic [ref=e763]: Free
+            - link "Register Now" [ref=e766] [cursor=pointer]:
+              - /url: /login
+    - generic [ref=e767]:
+      - generic [ref=e768]:
+        - generic [ref=e769]:
+          - img "H2S Logo" [ref=e770]
+          - paragraph [ref=e771]: Equip your company with the most comprehensive innovation management platform, supported by human intelligence.
+          - generic [ref=e773]:
+            - link [ref=e774] [cursor=pointer]:
+              - /url: https://www.facebook.com/hack2skill/
+            - link [ref=e777] [cursor=pointer]:
+              - /url: https://www.instagram.com/hack2skill/
+            - link [ref=e780] [cursor=pointer]:
+              - /url: https://twitter.com/hack2skill
+            - link [ref=e783] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/hack2skill/mycompany/
+            - link [ref=e786] [cursor=pointer]:
+              - /url: https://discord.com/invite/KMKtbxBJpW
+            - link [ref=e789] [cursor=pointer]:
+              - /url: https://www.youtube.com/channel/UCw2br80x_dpvJoAsSCC-bGA
+            - link [ref=e792] [cursor=pointer]:
+              - /url: https://wa.me/919870330830
+            - link [ref=e795] [cursor=pointer]:
+              - /url: https://line.me/ti/p/pY_5cjVe3S
+          - generic [ref=e798]:
+            - link "Our Blogs" [ref=e799] [cursor=pointer]:
+              - /url: https://blog.hack2skill.com/
+            - link "Privacy Policy" [ref=e800] [cursor=pointer]:
+              - /url: /privacy-policy
+            - link "Terms of Service" [ref=e801] [cursor=pointer]:
+              - /url: https://hack2skill.com/legacy/tnc
+            - link "Cookie Policy" [ref=e802] [cursor=pointer]:
+              - /url: /cookie-policy
+          - generic [ref=e803] [cursor=pointer]: Cookie Settings
+        - generic [ref=e804]:
+          - heading "Contact with us:" [level=5] [ref=e805]
+          - generic [ref=e806]:
+            - generic [ref=e807]: "For Business Inquiry:"
+            - link "info@Hack2skill.com" [ref=e808] [cursor=pointer]:
+              - /url: mailto:info@hack2skill.com
+          - generic [ref=e812]:
+            - text: "For Support & Queries:"
+            - link "support@Hack2skill.com" [ref=e813] [cursor=pointer]:
+              - /url: mailto:support@hack2skill.com
+          - generic [ref=e817]:
+            - text: "Call:"
+            - link "+91 9870330830" [ref=e818] [cursor=pointer]:
+              - /url: tel:+91 9870330830
+        - generic [ref=e822]:
+          - heading "Corporate Address:" [level=5] [ref=e823]
+          - generic [ref=e824]:
+            - heading "India:" [level=6] [ref=e825]
+            - heading "Delhi NCR:" [level=6] [ref=e826]
+            - paragraph [ref=e827]: A-14, 4th floor Eco Tower, Sector 125, Noida, Uttar Pradesh 201303
+            - heading "Bengaluru:" [level=6] [ref=e828]
+            - paragraph [ref=e829]: Wework Galaxy, 43, Residency Rd, Shanthala Nagar, Ashok Nagar, Bengaluru, Karnataka 560025
+          - generic [ref=e830]:
+            - heading "USA:" [level=6] [ref=e831]
+            - heading "Michigan:" [level=6] [ref=e832]
+            - paragraph [ref=e833]: 2025, Long Lake, Troy, Michigan , 48098- Zip Code, (248)
+      - generic [ref=e834]:
+        - separator [ref=e835]
+        - generic [ref=e836]: 2026 © All rights reserved by Hack2skill
+  - generic [ref=e847]:
+    - heading "Modal Title" [level=3] [ref=e867]: Accept the use of cookies
+    - generic [ref=e868]:
+      - paragraph [ref=e870]:
+        - text: We use cookies to improve your browsing experience, serve personalized content, and analyze our traffic. By clicking Accept all Cookies, you agree to the storing of cookies on your device. You can customize your settings by clicking
+        - generic [ref=e871] [cursor=pointer]: Manage Preferences
+        - text: . For more information, please review our
+        - link "Cookies Policy" [ref=e872] [cursor=pointer]:
+          - /url: /cookie-policy
+        - text: and
+        - link "Privacy Policy" [ref=e873] [cursor=pointer]:
+          - /url: /privacy-policy
+        - text: .
+      - generic [ref=e875]:
+        - button "Accept Recommended Cookies" [ref=e876] [cursor=pointer]
+        - button "Accept All Cookies" [ref=e877] [cursor=pointer]
