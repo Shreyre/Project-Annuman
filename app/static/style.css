@@ -1,0 +1,158 @@
+:root {
+  --paper: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #1b2130;
+  --muted: #5b6475;
+  --rule: #d6dce4;
+  --carbon: #3a3e9e;      /* register ink: the duplicate-book carbon copy */
+  --ok: #1e7a5a;
+  --scarce: #c98a00;      /* turmeric */
+  --scarce-text: #7d5500;
+  --out: #b8232b;         /* sindoor */
+  --sub: #5b7db1;
+  --radius-s: 3px;
+  --radius-m: 10px;
+  font-size: 16px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1rem/1.5 "Atkinson Hyperlegible", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--carbon); outline-offset: 2px; }
+
+.top, .clock, .headline, .layout, .proof, .foot { padding-inline: clamp(16px, 4vw, 48px); }
+
+.top {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 2rem;
+  padding-block: 1.5rem .75rem;
+}
+.brand h1 { margin: 0; font-size: 2.25rem; line-height: 1.1; letter-spacing: -.01em; }
+.tagline { margin: .25rem 0 0; color: var(--muted); font-size: 1.125rem; }
+.synthetic {
+  margin: 0; padding: .2rem .6rem; border: 1.5px dashed var(--carbon); border-radius: var(--radius-s);
+  color: var(--carbon); font-weight: 700; font-size: .875rem;
+}
+
+.clock {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem;
+  padding-block: .75rem; border-block: 1px solid var(--rule); background: var(--surface);
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2;
+}
+.clock button {
+  min-width: 5.5rem; padding: .4rem .9rem; border: 1.5px solid var(--ink); border-radius: var(--radius-s);
+  background: var(--ink); color: #fff; font-weight: 700; cursor: pointer;
+}
+.clock button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
+.day-label { font-weight: 700; min-width: 5.5rem; }
+#day { flex: 1 1 16rem; accent-color: var(--carbon); }
+.truth { color: var(--muted); display: flex; gap: .4rem; align-items: center; cursor: pointer; }
+
+.headline { padding-block: 1.25rem .5rem; }
+.headline p { margin: 0; font-size: clamp(1.25rem, 2.4vw, 1.75rem); line-height: 1.3; max-width: 46ch; }
+.headline .ledger { font-size: 1.15em; }
+
+/* the register, in the hand it is written in */
+.ledger { font-family: "Kalam", "Segoe Print", cursive; color: var(--carbon); font-weight: 400; }
+.struck { text-decoration: line-through; text-decoration-color: var(--out); text-decoration-thickness: 3px; }
+
+.layout {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr); gap: 1.5rem;
+  padding-block: 1rem 2rem; align-items: start;
+}
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+.legend { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; color: var(--muted); font-size: .875rem; margin-bottom: .75rem; }
+.legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.sw { width: 14px; height: 14px; border-radius: 2px; display: inline-block; }
+
+.grid-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-m); }
+#grid { border-collapse: collapse; width: 100%; font-size: .875rem; }
+#grid th { font-weight: 700; text-align: left; padding: .35rem .5rem; white-space: nowrap; }
+#grid thead th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 400; vertical-align: bottom; }
+#grid thead th.drug { writing-mode: vertical-rl; transform: rotate(180deg); height: 8.5rem; padding: .5rem .25rem; }
+#grid tr.state th { padding-top: .9rem; font-size: 1rem; color: var(--ink); }
+#grid tr.wh th { color: var(--muted); font-weight: 400; padding-top: .35rem; }
+#grid td { padding: 2px; text-align: center; }
+#grid tbody th.phc { font-weight: 400; color: var(--muted); }
+
+.cell {
+  width: 30px; height: 26px; border: 0; border-radius: var(--radius-s); cursor: pointer; display: block; margin: auto;
+  position: relative;
+}
+.ok { background: var(--ok); }
+.scarce { background: var(--scarce); }
+.out { background: var(--out); }
+/* phantom: the register disagrees - carbon hatching over the empty shelf */
+.phantom { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.0) 0 4px, rgba(255,255,255,.75) 4px 6px); }
+.cell.sel { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--ink); }
+.cell .truthdot {
+  position: absolute; right: 3px; top: 3px; width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid #fff;
+}
+.truthdot.t-ok { background: var(--ok); } .truthdot.t-low { background: var(--scarce); } .truthdot.t-out { background: var(--out); }
+
+.detail {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-m);
+  padding: 1.25rem 1.25rem 1.5rem; position: sticky; top: 4.5rem;
+}
+.hint { color: var(--muted); margin: 0; }
+.detail h2 { margin: 0; font-size: 1.375rem; line-height: 1.2; }
+.detail .where { margin: .15rem 0 1rem; color: var(--muted); }
+.versus { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.versus div { border-top: 3px solid var(--rule); padding-top: .5rem; }
+.versus .reg { border-color: var(--carbon); }
+.versus .shelf.ok { border-color: var(--ok); background: none; }
+.versus .shelf.scarce { border-color: var(--scarce); background: none; }
+.versus .shelf.out { border-color: var(--out); background: none; }
+.versus small { display: block; color: var(--muted); }
+.versus .big { font-size: 1.75rem; line-height: 1.2; font-weight: 700; }
+.versus .ledger.big { font-weight: 400; font-size: 2rem; }
+.state-ok { color: var(--ok); } .state-scarce { color: var(--scarce-text); } .state-out { color: var(--out); }
+
+.why { margin: 0 0 .5rem; }
+.chart { width: 100%; height: auto; display: block; margin: .25rem 0 .5rem; }
+.chart-key { display: flex; flex-wrap: wrap; gap: .2rem 1rem; font-size: .8125rem; color: var(--muted); margin-bottom: 1rem; }
+.chart-key span { display: inline-flex; align-items: center; gap: .35rem; }
+
+.tree { list-style: none; margin: 0 0 1rem; padding: 0; }
+.tree li { position: relative; padding: .3rem 0 .3rem 1.6rem; color: var(--muted); }
+.tree li::before { content: ""; position: absolute; left: .45rem; top: 0; bottom: 0; border-left: 2px solid var(--rule); }
+.tree li::after { content: ""; position: absolute; left: .1rem; top: .75rem; width: .8rem; height: .8rem; border-radius: 50%; background: var(--surface); border: 2px solid var(--rule); }
+.tree li.hit { color: var(--ink); }
+.tree li.hit::after { background: var(--scarce); border-color: var(--scarce); }
+.tree li.broke { color: var(--out); font-weight: 700; }
+.tree li.broke::after { background: var(--out); border-color: var(--out); }
+.action { margin: 0 0 1.25rem; padding: .75rem 1rem; border-left: 4px solid var(--out); background: #fbeeee; }
+.action.local { border-color: var(--scarce); background: #fbf4e3; }
+
+.confirm p { margin: 0 0 .5rem; }
+.confirm .buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
+.confirm button {
+  padding: .55rem .9rem; border-radius: var(--radius-s); border: 1.5px solid var(--ink); background: var(--surface); cursor: pointer;
+  text-align: left; line-height: 1.25;
+}
+.confirm button .or { display: block; font-family: "Noto Sans Oriya", sans-serif; font-weight: 500; }
+.confirm button.yes { background: var(--ink); color: #fff; }
+.confirm .done { color: var(--ok); font-weight: 700; }
+
+.proof { padding-block: 1.5rem 1rem; border-top: 1px solid var(--rule); background: var(--surface); }
+.proof h2 { margin: 0 0 .25rem; font-size: 1.375rem; }
+.proof-note { margin: 0 0 1rem; color: var(--muted); max-width: 70ch; }
+.proof-wrap { overflow-x: auto; }
+#proof { border-collapse: collapse; min-width: 34rem; }
+#proof th, #proof td { padding: .5rem 1.25rem .5rem 0; text-align: left; border-bottom: 1px solid var(--rule); }
+#proof thead th { color: var(--muted); font-weight: 400; }
+#proof tbody tr:first-child { font-weight: 700; }
+#triageNote { margin-top: 1rem; }
+.foot { padding-block: 1rem 2rem; color: var(--muted); font-size: .875rem; background: var(--surface); }
+.foot p { margin: 0; max-width: 90ch; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .cell { transition: background-color .25s ease; }
+}

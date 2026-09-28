@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anumaan: the shelf behind the register</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23b8232b'/%3E%3Cpath d='M3 5h10M3 8h10M3 11h6' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Kalam:wght@400&family=Noto+Sans+Oriya:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Anumaan</h1>
+    <p class="tagline">The register says it's on the shelf. The care says otherwise.</p>
+  </div>
+  <p class="synthetic" title="All facilities, patients and stock in this demo are simulated.">Synthetic data</p>
+</header>
+
+<section class="clock" aria-label="Replay controls">
+  <button id="play" type="button" aria-pressed="false">Play</button>
+  <label class="day-label" for="day">Day <output id="dayOut">0</output></label>
+  <input id="day" type="range" min="0" max="199" value="0">
+  <label class="truth"><input id="truth" type="checkbox"> Show ground truth</label>
+</section>
+
+<section class="headline" aria-live="polite">
+  <p id="phantomLine"></p>
+</section>
+
+<main class="layout">
+  <section class="network" aria-label="PHC network">
+    <div class="legend" aria-hidden="true">
+      <span><i class="sw ok"></i>Stocked</span>
+      <span><i class="sw scarce"></i>Running short</span>
+      <span><i class="sw out"></i>Empty</span>
+      <span><i class="sw out phantom"></i>Empty, register still shows stock</span>
+    </div>
+    <div class="grid-wrap"><table id="grid"></table></div>
+  </section>
+
+  <aside class="detail" id="detail" aria-live="polite">
+    <p class="hint">Select a PHC and medicine to see why Anumaan thinks what it thinks.</p>
+  </aside>
+</main>
+
+<section class="proof" aria-labelledby="proofTitle">
+  <h2 id="proofTitle">How well it works</h2>
+  <p class="proof-note">Scored against the simulator's hidden ground truth. A catch is an alarm up to three weeks before the shelf empties.</p>
+  <div class="proof-wrap"><table id="proof"></table></div>
+  <p id="triageNote" class="proof-note"></p>
+</section>
+
+<footer class="foot">
+  <p id="grammarNote"></p>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>

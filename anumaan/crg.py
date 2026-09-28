@@ -26,18 +26,20 @@ def index(crg):
     di = {d: i for i, d in enumerate(drugs)}
     share = np.zeros((len(conds), len(drugs)))   # expected courses per diagnosis
     units = np.zeros((len(conds), len(drugs)))   # expected units per diagnosis
-    days, sub_of = {}, {}
+    days, sub_of, course = {}, {}, {}
     for c, spec in crg["conditions"].items():
         for co in spec["courses"]:
             a, b = ci[c], di[co["drug"]]
             share[a, b] = co.get("share", 1.0)
             units[a, b] = share[a, b] * co["units_per_day"] * co["days"]
             days[(a, b)] = co["days"]
-            for s in co["substitutes"]:
-                sub_of[(a, di[s["drug"]])] = b
+            subs = [(di[s["drug"]], s["units_per_day"], s["days"]) for s in co["substitutes"]]
+            course[(a, b)] = (co["units_per_day"], co["days"], subs)
+            for s, _, _ in subs:
+                sub_of[(a, s)] = b
     primaries = sorted({b for (_, b) in days})
     return dict(conds=conds, drugs=drugs, ci=ci, di=di, share=share, units=units,
-                days=days, sub_of=sub_of, primaries=primaries)
+                days=days, sub_of=sub_of, course=course, primaries=primaries)
 
 
 def aggregate(ix, dx, slips, na):
@@ -46,14 +48,15 @@ def aggregate(ix, dx, slips, na):
     dx:    int array [day, facility, condition] of diagnoses
     slips: iterable of (day, fac, cond, drug, days_of_therapy, units)
     na:    iterable of (day, fac, cond, drug) not-available records
-    Returns dict with N (expected courses), exp_units and the CATS counts.
+    Returns dict with N (expected courses), exp_units, units dispensed and the CATS counts.
     """
     n_days, n_fac, _ = dx.shape
     shape = (n_days, n_fac, len(ix["drugs"]))
-    out = {k: np.zeros(shape) for k in CATS}
+    out = {k: np.zeros(shape) for k in (*CATS, "units")}
     out["N"] = dx @ ix["share"]
     out["exp_units"] = dx @ ix["units"]
-    for t, f, c, d, dot, _units in slips:
+    for t, f, c, d, dot, units in slips:
+        out["units"][t, f, d] += units
         if (c, d) in ix["days"]:
             out["full" if dot >= ix["days"][(c, d)] else "ration"][t, f, d] += 1
         elif (c, d) in ix["sub_of"]:

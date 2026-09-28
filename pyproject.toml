@@ -1,0 +1,12 @@
+[project]
+name = "anumaan"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+grammar = ["google-genai>=1.66"]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
