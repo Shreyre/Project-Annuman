@@ -24,7 +24,8 @@ gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA" 
   --role roles/aiplatform.user --condition None --quiet >/dev/null
 
 # builds with Cloud Build from the Dockerfile; .env is excluded (.gitignore / .dockerignore).
-# If the build fails on permissions, grant roles/run.builder to
+# On a brand-new project the first build can fail on permissions while IAM propagates:
+# wait a minute and re-run. If it keeps failing, grant roles/run.builder to
 # PROJECT_NUMBER-compute@developer.gserviceaccount.com.
 gcloud run deploy anumaan --source . --project "$PROJECT" --region "$REGION" \
   --service-account "$SA" --min-instances 0 --max-instances 3 --memory 1Gi \

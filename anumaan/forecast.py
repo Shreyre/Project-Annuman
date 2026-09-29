@@ -9,27 +9,31 @@ out-days filled from the in-stock rate (adjust_consumption); against that the CR
 lead after stock-outs is modest, not the gap plain consumption suggests.
 
     python -m anumaan.forecast --seeds 5-9
+    python -m anumaan.forecast --bigquery anumaan-c4c.anumaan_forecast   # + TimesFM on BigQuery
 
 Scored on SYNTHETIC data against GROUND TRUTH run.true_use. The sim defines demand
 as diagnoses x CRG units, so this measures what censoring and prescribing drift
 cost consumption forecasts, not whether the CRG itself is right.
 """
 import argparse
+import json
+import time
 
 import numpy as np
 
 from anumaan import crg as G, sim
 from anumaan.evaluate import _range
 
-# ponytail: damped-trend exponential smoothing on a small grid. The cloud version is
-# BigQuery AI.FORECAST with TimesFM 3.0 (see bigquery_sql); swap it in when the feeds
-# live in BigQuery.
+# ponytail: damped-trend exponential smoothing on a small grid, run locally. BigQuery
+# AI.FORECAST (TimesFM, bigquery_sql) runs on the same series with --bigquery; on seeds 5-9 it
+# trails this ETS (it forecasts the daily median, which undershoots sparse counts).
 # (alpha level, beta trend, phi damping); grid and the in-sample-mean level start chosen on
 # seeds 0-4, scored on the CRG arm only (the consumption arms reuse it untuned)
 GRID = np.array([(a, b, p) for a in (0.01, 0.02, 0.05, 0.1, 0.2, 0.4) for b in (0.0, 0.05, 0.2) for p in (0.8, 0.95)])
 Z80 = 1.2816   # two-sided 80% normal quantile
 BURN = 14      # one-step errors before this are ignored when picking parameters
 MIN_ERR = 7    # fewer one-step errors than this: no interval (NaN), not a fake-narrow one
+TIMESFM = "TimesFM 3.0"   # Preview in BigQuery (docs of 2026-09-29); "TimesFM 2.5" is the GA default
 
 
 def forecast_series(y, horizon):
@@ -103,39 +107,119 @@ def forecast_consumption(units, t, horizon=14, out=None):
     return _total(units if out is None else adjust_consumption(units, out, t), t, horizon)
 
 
-def bigquery_sql(table, horizon=14):
-    """The cloud version of forecast_series: BigQuery AI.FORECAST with TimesFM 3.0.
-    NOT executed anywhere here - no BigQuery in this prototype; the string is for the
-    deployment notes. Expects a long table, one row per facility x condition x day:
-    day DATE, facility_id, condition, diagnoses (target), rainfall_mm (past covariate:
-    observed only), is_holiday (future covariate). Future rows carry the day and
-    is_holiday with NULL diagnoses / rainfall_mm. Multiply the forecast by the CRG
-    units per diagnosis downstream, as forecast_demand does."""
-    return f"""SELECT *
+def bigquery_sql(table, origins, horizon=14, model=TIMESFM):
+    """The BigQuery version of forecast_series, as timesfm_forecast runs it: one univariate,
+    zero-shot AI.FORECAST call over every seed x facility x condition x origin. `table` has
+    one row per seed x facility x condition x day (all INT64): seed, fac, cond, day, dx
+    (diagnoses). Each origin gets its own series, cut at day <= origin, and origin is an
+    id column, so one call backtests every origin. Rows back: the ids, day, forecast_value
+    (the median), the 80% interval and ai_forecast_status ('' when it worked).
+    No covariates: the sim has none. Real rainfall (past) and holidays (future) would use
+    the multivariate form - target_cols, past_covariate_cols, future_covariate_cols -
+    which needs TimesFM 3.0 (Preview). Multiply by the CRG units per diagnosis downstream,
+    as forecast_demand does."""
+    return f"""WITH s AS (
+  SELECT seed, fac, cond, origin, DATE_ADD(DATE '2000-01-01', INTERVAL day DAY) AS date, dx
+  FROM `{table}`, UNNEST([{', '.join(str(int(t)) for t in origins)}]) AS origin
+  WHERE day <= origin)
+SELECT seed, fac, cond, origin, DATE_DIFF(DATE(forecast_timestamp), DATE '2000-01-01', DAY) AS day,
+  forecast_value, prediction_interval_lower_bound, prediction_interval_upper_bound, ai_forecast_status
 FROM AI.FORECAST(
-  TABLE `{table}`,
-  model => 'TimesFM 3.0',
-  timestamp_col => 'day',
-  target_cols => ['diagnoses'],
-  past_covariate_cols => ['rainfall_mm'],
-  future_covariate_cols => ['is_holiday'],
-  id_cols => ['facility_id', 'condition'],
+  TABLE s,
+  data_col => 'dx',
+  timestamp_col => 'date',
+  model => '{model}',
+  id_cols => ['seed', 'fac', 'cond', 'origin'],
   horizon => {int(horizon)},
-  confidence_level => 0.8
-)"""
+  confidence_level => 0.8)"""
 
 
-def evaluate_forecast(run, horizon=14, first=45, every=14):
+def parse_timesfm(rows, seeds, origins, F, C, horizon=14):
+    """bigquery_sql's rows (seed, fac, cond, origin, day, value, lo, hi, status) ->
+    {seed: {origin: (mean, lo, hi)}}, each [horizon, F, C] daily diagnoses. Raises unless
+    every series came back once, for days origin+1..origin+horizon, with no error status."""
+    bad = [r[-1] for r in rows if r[-1]]
+    if bad:
+        raise RuntimeError(f"AI.FORECAST failed on {len(bad)} rows, e.g. {bad[0]!r}")
+    a = np.array([r[:-1] for r in rows], float).reshape(-1, 8)
+    s, f, c, o, day = a[:, :5].astype(int).T
+    h = day - o - 1
+    X = np.full((3, len(seeds), len(origins), horizon, F, C), np.nan)
+    if len(a) != X[0].size or ((h < 0) | (h >= horizon)).any():
+        raise RuntimeError(f"expected {X[0].size} rows for days origin+1..origin+{horizon}, got {len(a)}")
+    si, oi = ({v: i for i, v in enumerate(k)} for k in (seeds, origins))
+    X[:, [si[v] for v in s], [oi[v] for v in o], h, f, c] = a[:, 5:].T
+    if np.isnan(X).any():
+        raise RuntimeError("some series x day came back twice, others never")
+    return {seed: {t: X[:, i, j] for j, t in enumerate(origins)} for i, seed in enumerate(seeds)}
+
+
+def _ok(r):
+    if not r.ok:            # keep BigQuery's own message: it names the failing SQL or quota
+        raise RuntimeError(f"BigQuery HTTP {r.status_code}: {r.text}")
+    return r.json()
+
+
+def timesfm_forecast(dataset, seeds, dxs, origins, horizon=14, model=TIMESFM):
+    """Run bigquery_sql for real. Loads the SYNTHETIC diagnoses (dxs: one [T, F, C] per seed)
+    into `project.dataset`.dx_synthetic, runs one AI.FORECAST query and parse_timesfm's it.
+    Application-default credentials, BigQuery REST. A missing dataset is created in Mumbai
+    (asia-south1): TimesFM runs in every BigQuery region, and Indian facility data should
+    stay in India. Returns ({seed: {origin: (mean, lo, hi)}}, the finished query job)."""
+    import google.auth      # only this path needs the cloud; the app and tests never import it
+    from google.auth.transport.requests import AuthorizedSession
+    project, ds = dataset.split(".")
+    bq = AuthorizedSession(google.auth.default(scopes=["https://www.googleapis.com/auth/bigquery"])[0])
+    api = f"https://bigquery.googleapis.com/bigquery/v2/projects/{project}"
+
+    def done(job):
+        ref = job["jobReference"]
+        while job["status"]["state"] != "DONE":
+            time.sleep(2)
+            job = _ok(bq.get(f"{api}/jobs/{ref['jobId']}", params={"location": ref["location"]}))
+        if "errorResult" in job["status"]:
+            raise RuntimeError(f"BigQuery job failed: {job['status']}")
+        return job
+
+    r = bq.post(f"{api}/datasets", json={"datasetReference": {"projectId": project, "datasetId": ds},
+                                         "location": "asia-south1"})
+    if r.status_code != 409:                                # 409: the dataset exists
+        _ok(r)
+    load = dict(destinationTable=dict(projectId=project, datasetId=ds, tableId="dx_synthetic"),
+                destinationTableProperties=dict(description="SYNTHETIC daily diagnoses from anumaan.sim"),
+                sourceFormat="CSV", writeDisposition="WRITE_TRUNCATE",
+                schema=dict(fields=[dict(name=n, type="INT64") for n in ("seed", "fac", "cond", "day", "dx")]))
+    csv = "\n".join(f"{s},{f},{c},{t},{v}" for s, dx in zip(seeds, dxs) for (t, f, c), v in np.ndenumerate(dx))
+    body = (f"--anumaan\r\nContent-Type: application/json\r\n\r\n{json.dumps(dict(configuration=dict(load=load)))}"
+            f"\r\n--anumaan\r\nContent-Type: text/csv\r\n\r\n{csv}\r\n--anumaan--\r\n")
+    done(_ok(bq.post(f"https://bigquery.googleapis.com/upload/bigquery/v2/projects/{project}/jobs",
+                     params={"uploadType": "multipart"}, data=body.encode(),
+                     headers={"Content-Type": "multipart/related; boundary=anumaan"})))
+    sql = bigquery_sql(f"{project}.{ds}.dx_synthetic", origins, horizon, model)
+    job = done(_ok(bq.post(f"{api}/jobs", json=dict(configuration=dict(query=dict(query=sql, useLegacySql=False))))))
+    ref, rows, page = job["jobReference"], [], {}
+    while True:                                             # ~200k rows: a few 10 MB pages
+        r = _ok(bq.get(f"{api}/queries/{ref['jobId']}", params={"location": ref["location"], **page}))
+        rows += [[v["v"] for v in row["f"]] for row in r.get("rows", [])]
+        if "pageToken" not in r:
+            break
+        page = {"pageToken": r["pageToken"]}
+    return parse_timesfm(rows, seeds, origins, *dxs[0].shape[1:], horizon), job
+
+
+def evaluate_forecast(run, horizon=14, first=45, every=14, timesfm=None):
     """Score 14-day demand per facility x primary drug against GROUND TRUTH true_use.
 
     Arms: crg (diagnoses ETS x CRG), consumption (ETS on dispensed units),
     consumption_adj (ETS on adjust_consumption, the fair baseline), crg_mean and
-    consumption_adj_mean (plain history means of the same inputs), rescaled (see below).
+    consumption_adj_mean (plain history means of the same inputs), rescaled (see below);
+    with timesfm ({origin: (mean, lo, hi)} from timesfm_forecast) also timesfm: TimesFM's
+    daily diagnoses x the same CRG units, and its interval coverage (coverage80_timesfm).
     Slices (all GROUND TRUTH, used only for scoring): after_out = origin during a
     stock-out at that facility x drug or within 30 days after it ended (consumption
     history censored); surge = true_use at the origin above 1.15x the baseline rate
     (the monsoon lift); calm = neither. crg_wins = share of cells where crg beat
-    consumption_adj.
+    consumption_adj. bias = each arm's forecast total / the true total, all cells.
     """
     ix, P = run.ix, list(run.ix["primaries"])
     T, F = run.dx.shape[:2]
@@ -145,7 +229,7 @@ def evaluate_forecast(run, horizon=14, first=45, every=14):
     # decomposition, not a baseline: consumption moved to the CRG level seen in the first
     # 30 days removes prescribing bias (definitional here), leaving censoring and noise
     level = obs["exp_units"][:30].sum(0) / np.maximum(units[:30].sum(0), 1e-9)
-    truth, pred, after, surge, cover = [], {}, [], [], []
+    truth, pred, after, surge, cover = [], {}, [], [], {}
     for t in range(first, T - horizon, every):
         truth.append(run.true_use[t + 1:t + 1 + horizon].sum(0)[:, P])
         adj = adjust_consumption(units, out, t)
@@ -165,10 +249,16 @@ def evaluate_forecast(run, horizon=14, first=45, every=14):
         surge.append(run.true_use[t][:, P] > 1.15 * run.rate[:, P])
         _, lo, hi = forecast_series(run.dx[:t + 1].reshape(t + 1, -1), horizon)
         fut = run.dx[t + 1:t + 1 + horizon].reshape(horizon, -1)
-        cover.append(((fut >= lo) & (fut <= hi)).mean())
+        cover.setdefault("coverage80", []).append(((fut >= lo) & (fut <= hi)).mean())
+        if timesfm is not None:          # same series, same CRG step; clipped at 0 like the ETS
+            mean, lo, hi = timesfm[t]
+            pred.setdefault("timesfm", []).append((np.maximum(mean, 0).sum(0) @ ix["units"])[:, P])
+            cover.setdefault("coverage80_timesfm", []).append(
+                ((fut >= lo.reshape(fut.shape)) & (fut <= hi.reshape(fut.shape))).mean())
     y, after, surge = np.array(truth), np.array(after), np.array(surge)
     err = {k: np.abs(np.array(v) - y) for k, v in pred.items()}
-    res = dict(coverage80=float(np.mean(cover)))
+    res = {k: float(np.mean(v)) for k, v in cover.items()}
+    res["bias"] = {k: float(np.sum(v) / y.sum()) for k, v in pred.items()}
     for name, m in (("all", np.ones_like(after)), ("after_out", after), ("surge", surge),
                     ("calm", ~after & ~surge)):
         res[name] = dict(cells=int(m.sum()), crg_wins=float((err["crg"] < err["consumption_adj"])[m].mean()),
@@ -180,10 +270,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="5-9", help="held-out seeds, e.g. 5-9 or 0,3")
     ap.add_argument("--behaviour", default="default", choices=sorted(sim.BEHAVIOUR))
+    ap.add_argument("--bigquery", metavar="PROJECT.DATASET",
+                    help="also score TimesFM: load the diagnoses there, run one AI.FORECAST query (ADC)")
+    ap.add_argument("--model", default=TIMESFM, help="AI.FORECAST model for --bigquery, e.g. 'TimesFM 2.5'")
     a = ap.parse_args()
     seeds = (list(range(int(a.seeds.split("-")[0]), int(a.seeds.split("-")[1]) + 1)) if "-" in a.seeds
              else [int(s) for s in a.seeds.split(",")])
-    rs = [evaluate_forecast(sim.simulate(seed=s, behaviour=a.behaviour)) for s in seeds]
+    runs = [sim.simulate(seed=s, behaviour=a.behaviour) for s in seeds]
+    tfm, job = {}, None
+    if a.bigquery:      # evaluate_forecast's origins: every 14 days from day 45, 14-day horizon
+        tfm, job = timesfm_forecast(a.bigquery, seeds, [r.dx for r in runs],
+                                    range(45, len(runs[0].dx) - 14, 14), model=a.model)
+    rs = [evaluate_forecast(r, timesfm=tfm.get(s)) for s, r in zip(seeds, runs)]
     print(f"SYNTHETIC demand-forecast evaluation - seeds {a.seeds}, behaviour '{a.behaviour}'")
     print("14-day demand per facility x primary drug, origins every 14 days from day 45;")
     print("WAPE vs GROUND TRUTH true_use (lower is better), range across seeds\n")
@@ -192,6 +290,7 @@ def main():
             ("consumption", "consumption", "{:.3f}"), ("cons. adj.", "consumption_adj", "{:.3f}"),
             ("CRG closer", "crg_wins", "{:.0%}"), ("mean: CRG", "crg_mean", "{:.3f}"),
             ("mean: cons. adj.", "consumption_adj_mean", "{:.3f}"), ("rescaled*", "rescaled", "{:.3f}"))
+    rows += (("TimesFM+CRG**", "timesfm", "{:.3f}"),) if a.bigquery else ()
     print(f"{'':18}" + "".join(f"{s:>12}" for s in slices))
     for label, key, fmt in rows:
         print(f"{label:18}" + "".join(f"{_range([x[s][key] for x in rs], fmt):>12}" for s in slices))
@@ -215,6 +314,17 @@ def main():
           " its calm error - neither method sees the monsoon coming; both lag it.")
     print("Not claimed: the sim's true demand IS diagnoses x CRG units, so part of the CRG's edge is")
     print("definitional (consumption also carries each PHC's prescribing bias); real CRG error is untested.")
+    if a.bigquery:
+        st, q = job["statistics"], job["statistics"]["query"]
+        share = lambda k: _range([x["bias"][k] for x in rs], "{:.0%}")
+        print(f"** TimesFM+CRG = the same daily diagnoses forecast by BigQuery AI.FORECAST ('{a.model}', zero-shot,")
+        print("   univariate, no covariates), times the same CRG units. AI.FORECAST returns the daily median, and")
+        print(f"   low counts are right-skewed, so the median sits under the mean: its 14-day totals come to {share('timesfm')}")
+        print(f"   of true use (ETS {share('crg')}, mean {share('crg_mean')}). 80% interval coverage: "
+              f"{_range([x['coverage80_timesfm'] for x in rs], '{:.0%}')} (ETS {_range([x['coverage80'] for x in rs], '{:.0%}')}).")
+        print(f"   One query, {sum(len(v) for v in tfm.values()) * runs[0].dx[0].size} series, {job['jobReference']['location']}: "
+              f"{int(q['totalBytesProcessed']) / 1e6:.1f} MB processed, {int(q['totalBytesBilled']) / 1e6:.1f} MB billed, "
+              f"{(int(st['endTime']) - int(st['startTime'])) / 1000:.0f} s.")
 
 
 if __name__ == "__main__":

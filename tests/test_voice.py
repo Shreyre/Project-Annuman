@@ -63,3 +63,15 @@ def test_env_file_parser(tmp_path, monkeypatch):
     monkeypatch.setattr(os, "environ", {"ANUMAAN_T3": "real"})    # restored after the test
     V.load_env(p)
     assert os.environ == {"ANUMAAN_T1": "a=b", "ANUMAAN_T2": "x", "ANUMAAN_T3": "real"}
+
+
+def test_brief_asks_in_the_officers_language_and_never_returns_half_a_form():
+    said = V.Brief(summary="ଆମୋକ୍ସିସିଲିନ ସରିଯାଇଛି", next_step="ପାଖ PHC ରୁ ପଠାନ୍ତୁ")
+    fake = Fake(SimpleNamespace(parsed=said))
+    assert V.write_brief({"medicine": "amoxicillin_500", "alarm": True}, "or", fake) == said.model_dump()
+    (prompt,) = fake.calls[0]["contents"]
+    assert "Odia" in prompt and "amoxicillin_500" in prompt and fake.calls[0]["config"].response_schema is V.Brief
+    with pytest.raises(ValueError):
+        V.write_brief({}, "xx", fake)
+    with pytest.raises(V.VoiceUnavailable):
+        V.write_brief({}, "en", Fake(SimpleNamespace(parsed=None)))

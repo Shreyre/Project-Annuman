@@ -9,8 +9,9 @@ on which days alarms began, and whether the state has stopped filling that
 warehouse's indents (starved, triage's ledger test); plus a summary of what its model
 learned (median and IQR of the prescribing rate rho and register trust tau per
 medicine). A group of fewer than k PHCs is suppressed, like the aggregation threshold
-of a BigQuery data clean room. The national project reads only these exports: a
-cross-state shortage view, and shared priors that it hands back to the states.
+of a BigQuery data clean room; anumaan/cleanroom.py builds the same rows on BigQuery.
+The national project reads only these exports: a cross-state shortage view, and shared
+priors that it hands back to the states.
 
 A national failure starves warehouses in every state within a week or two, while
 their buffers still hide it from the PHCs; no single state can tell it from its own
@@ -121,7 +122,7 @@ def assert_no_raw(export, k=K):
     """The clean room's gate: fixed schema, typed and bounded values, no facility ids, no
     group under k. k is the gate's own threshold, not the exporter's.
     ponytail: it caps what an export can carry but cannot tell a day number from any other
-    small int; a real clean room computes the aggregates itself in SQL."""
+    small int; a real clean room computes the aggregates itself in SQL, as anumaan/cleanroom.py does."""
     def need(ok, why):
         if not ok:          # not a bare assert: the gate must survive python -O
             raise AssertionError(why)

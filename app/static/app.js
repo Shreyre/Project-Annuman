@@ -9,6 +9,89 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};
 const pct = (x) => (x === null || x === undefined || Number.isNaN(x) ? "n/a" : `${Math.round(100 * x)}%`);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+Object.assign(state, { page: 0, display: "list", detailTab: "evidence", request: 0, detailRequest: 0, saving: false });
+const PAGE_SIZE = 8;
+let toastTimer;
+function tween(el, to) {   // counts glide to their new value, so a change of day reads as change
+  const from = +el.dataset.v || 0;
+  el.dataset.v = to;
+  if (calm() || from === to) { el.textContent = fmt(to); return; }
+  const t0 = performance.now(), dur = from ? 350 : 700;
+  const step = (now) => {
+    if (+el.dataset.v !== to) return;   // a newer value took over
+    const k = Math.min(1, (now - t0) / dur);
+    el.textContent = fmt(from + (to - from) * (1 - (1 - k) ** 3));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function notify(message) {
+  $("#toast").textContent = message;
+  $("#toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $("#toast").hidden = true; }, 5500);
+}
+function stopReplay() {
+  clearInterval(state.timer);
+  state.timer = null;
+  $("#play span").textContent = "Play";
+  $("#play").setAttribute("aria-pressed", "false");
+}
+function showError(message) {
+  stopReplay();
+  $("#loadError span").textContent = message;
+  $("#loadError").hidden = false;
+}
+function renderSignals() {
+  if (!state.dayData) return;
+  const query = $("#search").value.trim().toLowerCase().replace(/\s+/g, " ");
+  const region = $("#stateFilter").value, status = $("#statusFilter").value;
+  const matches = (c) => {
+    const p = place(c.f), words = `${p.st} ${p.wh} ${p.phc} ${drugName(c.j)} ${state.meta.facilities[c.f].id}`.replace(/\s+/g, " ").toLowerCase();
+    return (!query || words.includes(query)) && (!region || state.meta.facilities[c.f].st === region)
+      && (!status || (status === "phantom" ? c.phantom : c.regime === status));
+  };
+  const rank = (c) => c.phantom ? 0 : c.regime === "OUT" ? 1 : c.regime === "SCARCE" ? 2 : 3;
+  const rows = state.dayData.cells.filter(matches).sort((a, b) => rank(a) - rank(b) || a.f - b.f || a.j - b.j);
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  state.page = Math.min(state.page, pages - 1);
+  const visible = rows.slice(state.page * PAGE_SIZE, (state.page + 1) * PAGE_SIZE);
+  $("#signalList").classList.toggle("refresh", Boolean(state.animateList) && !calm());
+  state.animateList = false;
+  $("#signalList").innerHTML = rows.length ? `<div class="scroll"><table class="signal-table"><thead><tr><th scope="col">Facility and medicine</th><th scope="col">Shelf</th><th scope="col" class="register-col num">Register</th><th scope="col" class="num">Days left</th></tr></thead><tbody>${visible.map((c, i) => {
+    const p = place(c.f), [cls, word] = REGIME[c.regime], selected = state.sel?.f === c.f && state.sel?.j === c.j;
+    return `<tr class="${selected ? "selected" : ""}" data-f="${c.f}" data-j="${c.j}" style="--i:${i}"><td><button class="signal-link" data-f="${c.f}" data-j="${c.j}" aria-pressed="${selected}" aria-label="Investigate ${p.phc}, ${p.wh}, ${p.st}, ${drugName(c.j)}">${drugName(c.j)}</button><small>${p.phc}, ${p.wh}, ${p.st}</small></td><td><span class="badge ${cls}${c.phantom ? " phantom" : ""}">${c.phantom ? "Hidden stock-out" : word}</span>${c.confirmed ? '<small>Shelf check recorded</small>' : ''}</td><td class="register-col num"><span class="ledger${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unitOf(c.j)}</small></td><td class="num"><span class="days">${fmt(c.shadow)}</span><span class="cover ${cls}" style="--v:${Math.min(100, Math.round((100 * c.shadow) / 30))}%" aria-hidden="true"></span>${c.true === undefined ? '' : `<small>Actual: ${fmt(c.true)} ${unitOf(c.j)}</small>`}</td></tr>`;
+  }).join("")}</tbody></table></div>` : `<div class="empty-state"><strong>No matching signals</strong><p>Try another medicine, facility, or availability filter.</p><button class="button" id="clearFilters">Clear filters</button></div>`;
+  document.querySelectorAll(".metric").forEach((m) => m.setAttribute("aria-pressed", String(m.dataset.status === status)));
+  $("#signalList").setAttribute("aria-busy", "false");
+  $("#signalList").hidden = state.display !== "list";
+  $("#grid").hidden = state.display !== "matrix";
+  $("#pagination").hidden = state.display !== "list" || !rows.length;
+  $("#pageNumber").textContent = `${state.page + 1} / ${pages}`;
+  $("#prevPage").disabled = state.page === 0;
+  $("#nextPage").disabled = state.page >= pages - 1;
+  $("#resultCount").textContent = state.display === "list" && rows.length ? `${state.page * PAGE_SIZE + 1}–${Math.min(rows.length, (state.page + 1) * PAGE_SIZE)} of ${rows.length} signals` : `${rows.length} matching signals`;
+  state.cells.forEach((b, key) => { b.disabled = !matches(state.byKey.get(key)); });
+}
+
+const VIEWS = {
+  overview: ["Overview", "Network overview", "The register says it’s on the shelf. The care says otherwise."],
+  transfers: ["Redistribution", "Put supply where it’s needed", "Prioritize transfers and escalate the gaps that need a wider response."],
+  "national-view": ["National view", "See the bigger picture", "Connect state-level signals while keeping care records local."],
+  validation: ["Performance", "Confidence, backed by evidence", "What the model catches, how early, and where it falls short."]
+};
+function navigate() {
+  let key = location.hash.slice(1) || "overview";
+  if (key === "guide") { $("#guide").showModal(); return; }
+  if (!VIEWS[key]) key = "overview";
+  document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== key; });
+  document.querySelectorAll("[data-view]").forEach((a) => { if (a.dataset.view === key) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  const [label, title, description] = VIEWS[key];
+  $("#pageTitle").textContent = title;
+  $("#pageDescription").textContent = description;
+  document.title = `Anumaan · ${label}`;
+  hideTip();
+}
 
 function drugName(j) {   // names come from the (Gemini-compiled) rulebook, so escape them
   const [name, strength] = state.meta.drugs[j].name.split(/_(?=[^_]+$)/);
@@ -63,6 +146,8 @@ function buildGrid() {
   const grid = $("#grid");
   grid.innerHTML = html;
   grid.querySelectorAll(".cell").forEach((b) => { state.cells[+b.dataset.f * drugs.length + +b.dataset.j] = b; });
+  if (grid.dataset.bound) return;
+  grid.dataset.bound = "true";
   grid.addEventListener("click", (e) => {
     const b = e.target.closest(".cell");
     if (b) select(+b.dataset.f, +b.dataset.j, true);
@@ -93,17 +178,20 @@ function paintGrid(data) {
     b.className = `cell ${cls}${c.phantom ? " phantom" : ""}${sel ? " sel" : ""}${isNew && !calm() ? " flash" : ""}`;
     const p = place(c.f);
     b.setAttribute("aria-label", `${p.phc}, ${p.wh}, ${drugName(c.j)}: register ${fmt(c.book)}, shelf ${word.toLowerCase()}${c.phantom ? ", register disagrees" : ""}`);
+    b.setAttribute("aria-pressed", String(!!sel));
     b.innerHTML = c.true === undefined ? "" :
       `<span class="truthdot ${c.true_cover < 0.5 ? "t-out" : c.true_cover < 7 ? "t-low" : "t-ok"}" aria-hidden="true"></span>`;
   }
   state.prevPhantom = phantoms;
   state.prevDay = data.day;
-  for (const [k, n] of Object.entries(count)) $(`#legend b[data-k="${k}"]`).textContent = n;
+  count.out += count.phantom;
+  for (const [k, n] of Object.entries(count)) tween($(`#legend [data-k="${k}"]`), n);
   document.querySelectorAll(".st-count").forEach((el) => {
     const n = perState[el.dataset.st] || 0;
     el.textContent = n ? `${n} hidden ${n === 1 ? "stock-out" : "stock-outs"}` : "Registers agree";
     el.classList.toggle("has", n > 0);
   });
+  renderSignals();
 }
 
 const tip = $("#tip");
@@ -135,41 +223,72 @@ function hideTip() {
 function headline(data, draw = false) {
   const n = data.summary.phantom;
   let html = n
-    ? `${n} ${n === 1 ? "shelf" : "shelves"} the register calls stocked ${n === 1 ? "is" : "are"} actually empty.`
+    ? `${n} ${n === 1 ? "shelf looks" : "shelves look"} empty in care records, while the register still shows stock.`
     : "Every register agrees with the shelf today.";
-  const c = state.sel && data.cells.find((x) => x.f === state.sel.f && x.j === state.sel.j);
-  if (c && c.phantom) {
-    const p = place(c.f);
-    html += ` At ${p.phc}, ${p.wh}, the register still reads <span class="ledger struck">${fmt(c.book)}</span> ${unitOf(c.j)} of ${drugName(c.j).toLowerCase()}.`;
-  }
   const line = $("#phantomLine");
   line.classList.toggle("draw", draw);
   line.innerHTML = html;
 }
 
-function setDay(t) {
+function setDay(t) {   // the thumb and fill glide to the new day; the counter rolls to it
   $("#day").value = t;
-  $("#dayOut").textContent = t;
-  $("#day").style.setProperty("--p", `${(100 * t) / (state.meta.days - 1)}%`);
+  tween($("#dayOut"), t);
+  $(".range").style.setProperty("--t", t / (state.meta.days - 1));
+}
+function fading(el, on) {   // keep what is on screen while the next day loads, instead of flashing a skeleton
+  if (on && !el.children.length) el.innerHTML = '<div class="skeleton" role="status" aria-label="Loading"></div>';
+  else el.classList.toggle("updating", on);
 }
 
 async function show(t) {
+  const request = ++state.request, truth = state.truth;
   state.day = t;
   setDay(t);
-  const data = await cached(state.cache, `${t}|${state.truth}`, `/api/day/${t}${state.truth ? "?truth=true" : ""}`);
-  if (state.day !== t) return;
+  $("#signalList").setAttribute("aria-busy", "true");
+  $("#detail").inert = true;
+  fading($("#moves"), true);
+  fading($("#national"), true);
+  try {
+  const data = await cached(state.cache, `${t}|${truth}`, `/api/day/${t}${truth ? "?truth=true" : ""}`);
+  if (state.request !== request) return;
   state.dayData = data;
+  state.dayTruth = truth;
+  $("#loadError").hidden = true;
   paintGrid(data);
   headline(data, state.fresh);
-  if (state.sel) renderDetail();
+  const detail = state.sel ? renderDetail() : Promise.resolve();
   const [plan, nat] = await Promise.all([cached(state.side, `plan|${t}`, `/api/plan?t=${t}`),
     cached(state.side, `nat|${t}`, `/api/national?t=${t}`)]);
-  if (state.day !== t) return;
+  if (state.request !== request) return;
   renderMoves(plan);
   renderNational(nat);
+  fading($("#moves"), false);
+  fading($("#national"), false);
+  await detail;
+  $("#detail").inert = false;
+  } catch (e) {
+    if (state.request !== request) return;
+    $("#signalList").setAttribute("aria-busy", "false");
+    if (state.dayData) {
+      state.day = state.dayData.day;
+      state.truth = state.dayTruth;
+      $("#truth").checked = state.truth;
+      setDay(state.day);
+      await renderDetail();
+    }
+    $("#detail").inert = false;
+    fading($("#moves"), false);
+    fading($("#national"), false);
+    $("#moves").innerHTML = '<p class="note">Transfer recommendations are unavailable. Use Try again above to reload.</p>';
+    $("#national").innerHTML = '<p class="note">The national summary is unavailable. Use Try again above to reload.</p>';
+    showError("We couldn’t load this replay day. Check your connection and try again.");
+  }
 }
 
 function select(f, j, byUser = false) {
+  if (state.dayData?.day !== state.day) { notify("Loading this replay day. Please wait."); return; }
+  if (state.saving || state.rec) { notify("Finish the shelf check before changing facilities."); return; }
+  stopReplay();
   state.sel = { f, j };
   state.fresh = true;
   paintGrid(state.dayData);
@@ -177,8 +296,10 @@ function select(f, j, byUser = false) {
   renderDetail();
   const plan = state.side.get(`plan|${state.day}`);
   if (plan) renderMoves(plan);
-  if (byUser && matchMedia("(max-width: 960px)").matches)
+  if (byUser && matchMedia("(max-width: 1050px)").matches) {
+    $("#detail").focus({ preventScroll: true });
     $("#detail").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "start" });
+  }
 }
 
 /* ---------- charts ---------- */
@@ -260,23 +381,31 @@ function facilityBlock(fa, p) {
   const early = b.early_share_7d === null ? "" : ` ${pct(b.early_share_7d)} of last week's discharges were early.`;
   const truth = b.true_occupied === undefined ? "" : ` <strong>Ground truth:</strong> ${b.true_occupied} occupied.`;
   const beds = Array.from({ length: Math.min(b.capacity, 40) }, (_, i) => `<i class="${i < b.occupied ? "on" : ""}"></i>`).join("");
-  const rows = fa.staff.map((r) => `<tr><th scope="row">${CADRE[r.cadre]}</th><td>${r.in_position} of ${r.sanctioned}</td>
+  // four narrow columns so the table fits the side panel without scrolling: posts sit under the role
+  const rows = fa.staff.map((r) => `<tr><th scope="row">${CADRE[r.cadre]}<small>${r.in_position} of ${r.sanctioned} in post</small></th>
     <td>${r.in_position ? (r.marked_present ? "Present" : "Absent") : "n/a"}</td><td>${atWork(r)}</td>
     ${r.true_present === undefined ? "" : `<td>${r.true_present ? "At work" : "Away"}</td>`}</tr>`).join("");
   return `<section><h3>${p.phc} today</h3>
     <div class="beds" aria-hidden="true">${beds}</div>
     <p class="why">Beds: <strong>${b.occupied} of ${b.capacity}</strong> occupied, counted from admissions and recorded discharges${b.pressure ? ". Every bed is taken" : ""}.${early}${truth}</p>
-    <div class="scroll"><table class="data staff"><thead><tr><th scope="col">Staff</th><th scope="col">In post</th><th scope="col">Attendance</th><th scope="col">At work, from care records</th>${fa.staff[0].true_present === undefined ? "" : `<th scope="col">Ground truth</th>`}</tr></thead><tbody>${rows}</tbody></table></div>
+    <table class="data staff"><thead><tr><th scope="col">Staff</th><th scope="col">Attendance</th><th scope="col">At work, from care records</th>${fa.staff[0].true_present === undefined ? "" : `<th scope="col">Ground truth</th>`}</tr></thead><tbody>${rows}</tbody></table>
     <p class="note">Staff are shown by role only. No individuals and no location tracking.</p></section>`;
 }
 
 async function renderDetail() {
+  const request = ++state.detailRequest, truthMode = state.truth;
   const { f, j } = state.sel, t = state.day;
+  const panel = $("#detail");
+  panel.setAttribute("aria-busy", "true");
+  if (state.fresh || !panel.querySelector(".detail-tabs"))
+    panel.innerHTML = '<div class="panel-heading"><h2>Loading investigation…</h2></div><div class="detail-content"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+  else panel.classList.add("updating");   // same signal, new day: keep it on screen
   const c = state.dayData.cells.find((x) => x.f === f && x.j === j);
   const tq = state.truth ? "&truth=true" : "";
+  try {
   const [s, fc, fa] = await Promise.all([get(`/api/series/${f}/${j}?t=${t}${tq}`),
     get(`/api/forecast/${f}/${j}?t=${t}`), get(`/api/facility/${f}?t=${t}${tq}`)]);
-  if (state.day !== t || state.sel.f !== f || state.sel.j !== j) return;
+  if (state.detailRequest !== request || state.day !== t || state.truth !== truthMode || state.sel.f !== f || state.sel.j !== j) return;
   const p = place(f), [cls, word] = REGIME[c.regime], unit = unitOf(j);
   const sum = (k) => s[k].slice(-14).reduce((a, b) => a + b, 0);
   const sure = Math.min(99, Math.round(100 * Math.max(...c.p)));   // never claim certainty
@@ -287,9 +416,14 @@ async function renderDetail() {
     ${c.by_stock ? `<p class="why">Care still looks normal, but deliveries minus dispensing leave only about ${c.shadow} days of use. The shelf is running down before anyone has started rationing.</p>` : ""}
     <p class="why">${evidence(c, p)}</p>
     ${tree(c, p)}
-    <p class="action ${["LOCAL", "WAREHOUSE", "DEMAND-SURGE"].includes(c.level) ? "local" : ""}"><strong>Suggested next step:</strong> ${esc(state.meta.actions[c.level])}. Where it broke is read from the warehouse ledger; confirm with the district store before escalating.</p>`;
+    <p class="action ${["LOCAL", "WAREHOUSE", "DEMAND-SURGE"].includes(c.level) ? "local" : ""}"><strong>Suggested next step:</strong> ${esc(state.meta.actions[c.level])}. Where it broke is read from the warehouse ledger; confirm with the district store before escalating.</p>
+    <h3>Brief for the district officer</h3>
+    <p class="why">Gemini writes it from the evidence above, in the officer's language.</p>
+    <p><select id="briefLang" aria-label="Language of the brief"><option value="en">English</option><option value="or" lang="or">ଓଡ଼ିଆ (Odia)</option>
+      <option value="hi" lang="hi">हिन्दी (Hindi)</option><option value="ml" lang="ml">മലയാളം (Malayalam)</option></select>
+      <button type="button" class="button" id="briefBtn">Write brief</button></p>
+    <div id="briefOut" role="status"></div>`;
   const asked = c.confirmed ? `<p class="done">The pharmacist said: ${c.confirmed === "empty" ? "it's finished" : "we have it"}.</p>` : "";
-  const panel = $("#detail");
   if (state.fresh) {
     panel.classList.remove("enter");
     void panel.offsetWidth;   // restart the entrance animation
@@ -298,15 +432,17 @@ async function renderDetail() {
   } else panel.classList.remove("enter");
   state.fresh = false;
   panel.innerHTML = `
+    <div class="panel-heading"><span class="detail-label">Selected signal</span><span class="badge ${cls}">${c.phantom ? "Hidden stock-out" : word}</span></div><div class="detail-content">
     <h2>${drugName(j)}</h2>
     <p class="where">${p.phc}, ${p.wh}, ${p.st}, day ${t}</p>
     <div class="versus">
-      <div class="reg"><small>Register says</small><span class="ledger big${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unit}, about ${c.cover} days of use</small></div>
+      <div class="reg"><small>Register says</small><span class="ledger big${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unit}, ${c.cover} days of use</small></div>
       <div class="shelf is-${cls}"><small>Shelf, inferred from care</small><span class="big">${word}</span><span class="meter" aria-hidden="true"><i style="width:${sure}%"></i></span><small>${sure}% sure</small></div>
     </div>
     <p class="why">Deliveries in, minus what the dispensing slips took out: about <strong>${fmt(c.shadow)} days</strong> of use left${c.shadow < state.meta.low ? `, under the ${state.meta.low}-day warning line` : ""}.</p>
     ${truth}
-    <section>
+    <div class="detail-tabs" aria-label="Investigation sections"><button data-detail-tab="evidence">Evidence</button><button data-detail-tab="forecast">Forecast</button><button data-detail-tab="facility">Beds & staff</button></div>
+    <section data-pane="evidence">
       <h3>What the care shows</h3>
       <p class="why">In the last 14 days the diagnoses here called for about ${fmt(sum("N"))} courses.
         ${fmt(sum("full"))} were given in full, ${fmt(sum("ration"))} were cut short, ${fmt(sum("sub"))} were switched to a guideline substitute and ${fmt(sum("na"))} were marked not available.</p>
@@ -317,26 +453,52 @@ async function renderDetail() {
         <span><i class="dash"></i>Courses the diagnoses called for</span>
       </p>
     </section>
-    <section>${alarm}</section>
-    <section class="confirm">
+    <section data-pane="evidence">${alarm}</section>
+    <section class="confirm" data-pane="evidence">
       <h3>Ask the pharmacist</h3>
       <p class="why">Ask them to check the shelf. Their answer updates the estimate.</p>
       ${asked}
       <div class="buttons">
-        <button type="button" class="yes" data-answer="empty">Yes, it's finished<span class="or" lang="or">ହଁ, ସରିଯାଇଛି</span></button>
-        <button type="button" data-answer="available">No, we have it<span class="or" lang="or">ନା, ଅଛି</span></button>
+        <button type="button" class="yes" data-answer="empty">Yes, it's finished</button>
+        <button type="button" data-answer="available">No, we have it</button>
         <button type="button" class="rec" aria-pressed="false">Record the answer<span class="or">Any language</span></button>
       </div>
       <p id="confirmMsg" role="status"></p>
     </section>
-    <section>
+    <section data-pane="forecast">
       <h3>Next ${fc.days.length} days</h3>
       <p class="why">The diagnoses point to about <strong>${fmt(fc.total)}</strong> ${unit} of use. Dispensing history, with the stock-out days filled in, suggests about ${fmt(fc.consumption_total)}.</p>
       ${forecastChart(s, fc)}
     </section>
-    ${facilityBlock(fa, p)}`;
+    ${facilityBlock(fa, p).replace('<section>', '<section data-pane="facility">')}</div>`;
+  panel.setAttribute("aria-busy", "false");
+  panel.classList.remove("updating");
+  setDetailTab(state.detailTab);
+  panel.querySelectorAll("[data-detail-tab]").forEach((b) => b.addEventListener("click", () => setDetailTab(b.dataset.detailTab)));
   panel.querySelectorAll(".confirm button[data-answer]").forEach((b) => b.addEventListener("click", () => confirmShelf(b.dataset.answer)));
   panel.querySelector(".rec").addEventListener("click", (e) => recordAnswer(e.currentTarget));
+  panel.querySelector("#briefBtn")?.addEventListener("click", writeBrief);
+  } catch (e) {
+    if (state.detailRequest !== request) return;
+    panel.setAttribute("aria-busy", "false");
+    panel.classList.remove("updating");
+    panel.innerHTML = '<div class="empty-state"><strong>Investigation unavailable</strong><p>We couldn’t load the care evidence. Check your connection and try again.</p><button class="button" id="retryDetail">Retry investigation</button></div>';
+    $("#retryDetail").addEventListener("click", renderDetail);
+  }
+}
+
+function setDetailTab(tab) {
+  state.detailTab = tab;
+  document.querySelectorAll("[data-detail-tab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.detailTab === tab)));
+  document.querySelectorAll("[data-pane]").forEach((section) => { section.hidden = section.dataset.pane !== tab; });
+}
+
+function lockCheck(locked) {
+  state.saving = locked;
+  stopReplay();
+  clearTimeout(pending);
+  ["#day", "#truth", "#play"].forEach((s) => { $(s).disabled = locked; });
+  document.querySelectorAll(".confirm button").forEach((b) => { b.disabled = locked; });
 }
 
 function refreshAfterAnswer() {
@@ -346,54 +508,79 @@ function refreshAfterAnswer() {
 }
 
 async function confirmShelf(answer) {
+  if (state.saving) return;
+  lockCheck(true);
   const { f, j } = state.sel;
+  $("#confirmMsg").textContent = "Saving shelf check…";
   try {
     const r = await fetch("/api/confirm", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ f, j, t: state.day, answer }) });
     if (!r.ok) throw new Error(`the server answered ${r.status}`);
     await refreshAfterAnswer();
-    $("#confirmMsg").innerHTML = `<span class="done">Answer saved.</span> The estimate now includes it.`;
+    notify("Shelf check saved. The estimate now includes it.");
+    if ($("#confirmMsg")) $("#confirmMsg").innerHTML = `<span class="done">Answer saved.</span> The estimate now includes it.`;
   } catch (e) {
-    $("#confirmMsg").textContent = `Could not save the answer: ${e.message}.`;
-  }
+    notify("Could not save the shelf check. Please try again.");
+    if ($("#confirmMsg")) $("#confirmMsg").textContent = "Could not save the answer. Check your connection and try again.";
+  } finally { lockCheck(false); }
 }
 
 async function recordAnswer(btn) {
-  const say = (text) => { $("#confirmMsg").textContent = text; };   // transcripts are untrusted: text only
-  if (state.rec) return state.rec.stop();
-  let stream;
+  const say = (message) => { if ($("#confirmMsg")) $("#confirmMsg").textContent = message; };
+  if (state.rec) { if (state.rec.state === "recording") state.rec.stop(); return; }
+  if (state.saving) return;
+  lockCheck(true);
+  const { f, j } = state.sel, t = state.day;
+  let stream, rec;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    rec = new MediaRecorder(stream);
   } catch {
-    return say("The browser did not allow the microphone. Use the buttons instead.");
+    stream?.getTracks().forEach((track) => track.stop());
+    lockCheck(false);
+    return say("Microphone unavailable. Allow microphone access, or use the shelf-check buttons.");
   }
-  const rec = new MediaRecorder(stream), chunks = [], { f, j } = state.sel, t = state.day;
+  const chunks = [];
   rec.ondataavailable = (e) => chunks.push(e.data);
   rec.onstop = async () => {
-    stream.getTracks().forEach((tr) => tr.stop());
+    clearTimeout(limit);
+    stream.getTracks().forEach((track) => track.stop());
     state.rec = null;
+    btn.disabled = true;
     btn.setAttribute("aria-pressed", "false");
-    btn.firstChild.textContent = "Record the answer";
-    const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-    say("Listening to the answer...");
-    const r = await fetch(`/api/voice?f=${f}&j=${j}&t=${t}`, { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
-    if (r.status === 503) return say("Voice answers need Gemini on Vertex AI, which this copy of the demo is not connected to. Use the buttons.");
-    if (r.status === 429) return say("Voice answers are used up for today on this demo. Use the buttons.");
-    if (!r.ok) return say(`The recording could not be used (error ${r.status}). Record again, or use the buttons.`);
-    const h = await r.json();
-    if (h.answer === "unclear") return say(`Heard: "${h.transcript_en}". The answer was not clear. Ask again, or use the buttons.`);
-    await refreshAfterAnswer();
-    say(`Heard: "${h.transcript_en}". Saved as ${h.answer === "empty" ? "finished" : "in stock"}. Likely reason: ${h.cause.replace(/_/g, " ")}.`);
+    btn.firstChild.textContent = "Processing answer…";
+    say("Listening to the answer…");
+    try {
+      const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+      const r = await fetch(`/api/voice?f=${f}&j=${j}&t=${t}`, { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
+      if (r.status === 503) return say("Voice is unavailable on this demo. Use the shelf-check buttons.");
+      if (r.status === 429) return say("Voice answers are used up for today. Use the shelf-check buttons.");
+      if (!r.ok) return say("The recording could not be used. Record again, or use the buttons.");
+      const h = await r.json();
+      if (h.answer === "unclear") return say(`Heard: "${h.transcript_en}". The answer was not clear. Ask again, or use the buttons.`);
+      await refreshAfterAnswer();
+      say(`Heard: "${h.transcript_en}". Saved as ${h.answer === "empty" ? "finished" : "in stock"}. Likely reason: ${h.cause.replace(/_/g, " ")}.`);
+      notify("Voice shelf check saved. The estimate has been updated.");
+    } catch {
+      say("Could not send the recording. Check your connection and try again.");
+    } finally {
+      lockCheck(false);
+      btn.firstChild.textContent = "Record the answer";
+    }
   };
+  rec.onerror = () => { say("Recording interrupted. Please try again or use the buttons."); rec.stop(); };
   rec.start();
   state.rec = rec;
+  btn.disabled = false;
   btn.setAttribute("aria-pressed", "true");
   btn.firstChild.textContent = "Stop and send";
-  say("Recording. Ask whether the medicine is finished, then press Stop and send.");
+  say("Recording. Ask whether the medicine is finished, then press Stop and send. Recording stops after 30 seconds.");
+  const limit = setTimeout(() => { if (rec.state === "recording") rec.stop(); }, 30000);
 }
 
 /* ---------- lower sections ---------- */
 function renderMoves(plan) {
+  $("#moveCount").textContent = plan.transfers.length;
   const sel = state.sel && state.meta.facilities[state.sel.f].id;
   const moves = [...plan.transfers].sort((a, b) => (b.to_fac === sel || b.from_fac === sel) - (a.to_fac === sel || a.from_fac === sel) || b.courses - a.courses);
   const end = (id) => { const p = place(facOf(id)); return `<span class="end">${p.phc}<small>${p.wh}</small></span>`; };
@@ -403,7 +590,8 @@ function renderMoves(plan) {
       <span class="qty"><span class="vh">Send</span><b>${m.courses}</b> courses<small>${fmt(m.units)} ${unitOf(j)}</small></span>
       <span class="med">${drugName(j)}</span>
       <span class="route"><span class="vh">from</span>${end(m.from_fac)}<span class="road">${m.minutes} min by road</span><span class="vh">to</span>${end(m.to_fac)}</span>
-      <span class="st">${place(facOf(m.to_fac)).st}</span></li>`;
+      <span class="st">${place(facOf(m.to_fac)).st}${m.approved ? '<small class="done">Order approved</small>'
+        : `<button type="button" class="button" data-approve="${esc(JSON.stringify({ from_fac: m.from_fac, to_fac: m.to_fac, drug: m.drug }))}">Approve</button>`}</span></li>`;
   }).join("");
   const more = moves.length > 8 ? `<p class="note">And ${moves.length - 8} smaller transfers. Each goes out as a DVDMS-style issue order.</p>` : "";
   const groups = {};
@@ -418,6 +606,39 @@ function renderMoves(plan) {
   }).join("");
   $("#moves").innerHTML = (shown ? `<ul class="moves">${shown}</ul>${more}` : `<p class="note">Nothing to move today. No PHC in a local shortage has a calm neighbour with stock to spare.</p>`)
     + (escRows ? `<h3>Escalate instead of moving stock</h3><ul class="plain esc">${escRows}</ul>` : "");
+  $("#moves").querySelectorAll("[data-approve]").forEach((b) => b.addEventListener("click", () => approveMove(b)));
+}
+
+async function approveMove(b) {   // the district officer's one click: the transfer becomes an issue order
+  b.disabled = true;
+  try {
+    const r = await fetch("/api/approve", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: state.day, ...JSON.parse(b.dataset.approve) }) });
+    if (!r.ok) throw new Error(`approve answered ${r.status}`);
+    const o = await r.json();
+    b.outerHTML = `<small class="done">Order ${esc(o.indent_id)} approved</small>`;
+    state.side.delete(`plan|${o.day}`);   // the cached plan does not know about the approval yet
+    const from = place(facOf(o.from)), to = place(facOf(o.to));
+    notify(`Issue order ${o.indent_id} is in the ledger: ${o.courses} courses from ${from.phc}, ${from.wh} to ${to.phc}, ${to.wh}.`);
+  } catch (e) {
+    b.disabled = false;
+    notify("That transfer could not be approved. Try again.");
+  }
+}
+
+async function writeBrief() {   // Gemini turns the evidence above into a brief in the officer's language
+  const { f, j } = state.sel, t = state.day, lang = $("#briefLang").value, btn = $("#briefBtn"), out = $("#briefOut");
+  btn.disabled = true;
+  out.textContent = "Gemini is writing the brief…";
+  try {
+    const b = await get(`/api/brief/${f}/${j}?t=${t}&language=${lang}`);
+    if (state.sel.f !== f || state.sel.j !== j || state.day !== t) return;
+    out.innerHTML = `<p class="why" lang="${lang}">${esc(b.summary)}</p><p class="action" lang="${lang}"><strong>Next step:</strong> ${esc(b.next_step)}</p>`;
+  } catch (e) {
+    out.textContent = "Gemini could not write the brief just now. The evidence above still stands.";
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function renderNational(n) {
@@ -461,37 +682,113 @@ function proof(m) {
 }
 
 async function init() {
-  state.meta = await get("/api/meta");
-  $("#day").max = state.meta.days - 1;
-  $("#dayMax").textContent = state.meta.days - 1;
-  $("#grammarNote").textContent = `Rulebook ${state.meta.grammar}: ${state.meta.grammar_note}`;
-  buildGrid();
-  proof(await get("/api/eval"));
-  const s = state.meta.start;
-  state.sel = { f: s.f, j: s.j };
-  state.fresh = true;
-  await show(s.day);
-  setTimeout(() => document.body.classList.remove("intro"), 1800);
+  ["#day", "#truth", "#play", "#reviewHidden"].forEach((s) => { $(s).disabled = true; });
+  try {
+    state.meta = await get("/api/meta");
+    $("#day").max = state.meta.days - 1;
+    $("#dayMax").textContent = state.meta.days - 1;
+    $("#grammarNote").textContent = `Rulebook ${state.meta.grammar}: ${state.meta.grammar_note}`;
+    const states = [...new Set(state.meta.facilities.map((f) => f.st))];
+    $("#networkSize").textContent = `${state.meta.facilities.length} PHCs, ${states.length} states, ${state.meta.drugs.length} medicines`;
+    $("#stateFilter").innerHTML = '<option value="">All states</option>' + states.map((s) => `<option value="${esc(s)}">${stateName(s)}</option>`).join("");
+    buildGrid();
+    const s = state.meta.start;
+    state.sel = { f: s.f, j: s.j };
+    state.fresh = true;
+    await show(s.day);
+    ["#day", "#truth", "#play", "#reviewHidden"].forEach((s) => { $(s).disabled = false; });
+    await loadProof();
+  } catch {
+    showError("We couldn’t connect to the network. Check your connection and try again.");
+    $("#signalList").setAttribute("aria-busy", "false");
+    $("#detail").setAttribute("aria-busy", "false");
+    $("#signalList").innerHTML = '<div class="empty-state"><strong>Network unavailable</strong><p>Use Try again above to reconnect.</p></div>';
+    $("#detail").innerHTML = '<div class="empty-state"><strong>No signal loaded</strong><p>Investigation details will appear when the network connects.</p></div>';
+  } finally { document.body.classList.remove("intro"); }
 }
-
+async function loadProof() {
+  try { proof(await get("/api/eval")); }
+  catch {
+    $("#triageNote").innerHTML = 'Performance data could not load. <button class="button" id="retryProof">Try again</button>';
+    $("#retryProof").addEventListener("click", loadProof);
+  }
+}
 let pending;
 $("#day").addEventListener("input", (e) => {
+  stopReplay();
   const t = +e.target.value;
   setDay(t);
   clearTimeout(pending);
-  pending = setTimeout(() => show(t), 60);
+  pending = setTimeout(() => show(t), 100);
 });
-$("#truth").addEventListener("change", (e) => { state.truth = e.target.checked; show(state.day); });
+$("#truth").addEventListener("change", (e) => {
+  stopReplay();
+  clearTimeout(pending);
+  state.truth = e.target.checked;
+  show(+$("#day").value);
+});
 $("#play").addEventListener("click", () => {
-  const b = $("#play"), label = b.querySelector("span");
-  if (state.timer) { clearInterval(state.timer); state.timer = null; label.textContent = "Play"; b.setAttribute("aria-pressed", "false"); return; }
-  label.textContent = "Pause"; b.setAttribute("aria-pressed", "true");
-  state.timer = setInterval(() => {
-    if (state.day >= state.meta.days - 1) return $("#play").click();
-    show(state.day + 1);
-  }, 700);
+  clearTimeout(pending);
+  if (state.timer) return stopReplay();
+  $("#play span").textContent = "Pause";
+  $("#play").setAttribute("aria-pressed", "true");
+  const step = async () => {
+    if (state.day >= state.meta.days - 1) return stopReplay();
+    await show(state.day + 1);
+    if (state.timer) state.timer = setTimeout(step, 700);
+  };
+  state.timer = setTimeout(step, 700);
 });
-init().catch((e) => {
-  document.body.classList.remove("intro");
-  $("#detail").innerHTML = `<p class="hint">The demo could not start: ${esc(e.message)}. Check that the server is running.</p>`;
+["#search", "#stateFilter", "#statusFilter"].forEach((s) => $(s).addEventListener(s === "#search" ? "input" : "change", () => { state.page = 0; state.animateList = true; renderSignals(); }));
+document.querySelectorAll(".metric").forEach((m) => m.addEventListener("click", () => {   // each count is also a filter
+  $("#statusFilter").value = $("#statusFilter").value === m.dataset.status ? "" : m.dataset.status;
+  state.page = 0;
+  state.animateList = true;
+  renderSignals();
+}));
+$("#signalList").addEventListener("click", (e) => {
+  const button = e.target.closest("[data-f]");
+  if (button) select(+button.dataset.f, +button.dataset.j, true);
+  if (e.target.id === "clearFilters") {
+    ["#search", "#stateFilter", "#statusFilter"].forEach((s) => { $(s).value = ""; });
+    state.page = 0;
+    state.animateList = true;
+    renderSignals();
+    $("#search").focus();
+  }
 });
+$("#prevPage").addEventListener("click", () => { state.page--; state.animateList = true; renderSignals(); });
+$("#nextPage").addEventListener("click", () => { state.page++; state.animateList = true; renderSignals(); });
+document.querySelectorAll("[data-display]").forEach((b) => b.addEventListener("click", () => {
+  state.display = b.dataset.display;
+  document.querySelectorAll("[data-display]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  state.animateList = true;
+  renderSignals();
+  if (state.display === "matrix" && !calm()) {   // the matrix fills in square by square
+    $("#grid").classList.add("cascade");
+    setTimeout(() => $("#grid").classList.remove("cascade"), 1200);
+  }
+}));
+$("#reviewHidden").addEventListener("click", () => {
+  $("#search").value = "";
+  $("#stateFilter").value = "";
+  $("#statusFilter").value = "phantom";
+  state.page = 0;
+  state.animateList = true;
+  renderSignals();
+  $("#statusFilter").focus({ preventScroll: true });
+  $("#netTitle").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "center" });
+});
+$("#retry").addEventListener("click", async () => {
+  $("#retry").disabled = true;
+  try { if (state.dayData) await show(state.day); else await init(); }
+  finally { $("#retry").disabled = false; }
+});
+$("#help").addEventListener("click", () => $("#guide").showModal());
+const closeGuide = () => { $("#guide").close(); if (location.hash === "#guide") location.hash = "overview"; };
+$("#closeGuide").addEventListener("click", closeGuide);
+$("#startExploring").addEventListener("click", closeGuide);
+$("#guide").addEventListener("cancel", () => { if (location.hash === "#guide") location.hash = "overview"; });
+addEventListener("hashchange", navigate);
+navigate();
+init();

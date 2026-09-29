@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
-from app.main import app, replay
+from anumaan import voice
+from app.main import app, briefs, ledger, replay
 
 client = TestClient(app)
 
@@ -33,3 +34,25 @@ def test_shelf_check_and_voice_fallback():
     assert client.post("/api/confirm", json=dict(f=f, j=j, t=t, answer="maybe")).status_code == 422
     r = client.post(f"/api/voice?f={f}&j={j}&t={t}", content=b"not audio", headers={"Content-Type": "text/plain"})
     assert r.status_code == 422                                   # bad upload is refused before Gemini
+
+
+def test_approval_goes_to_the_ledger_and_the_brief_reads_the_same_evidence(monkeypatch):
+    meta = client.get("/api/meta").json()
+    t, f, j = meta["start"]["day"], meta["start"]["f"], meta["start"]["j"]
+    x = client.get(f"/api/plan?t={t}").json()["transfers"][0]
+    body = dict(t=t, from_fac=x["from_fac"], to_fac=x["to_fac"], drug=x["drug"])
+    o = client.post("/api/approve", json=body).json()
+    assert o["qty_units"] == x["units"] and o["indent_id"].startswith(f"RD-{t:03d}-")
+    assert client.post("/api/approve", json=body).json() == o      # one order per transfer, however often it is clicked
+    assert client.get("/api/ledger").json() == [o]
+    assert client.get(f"/api/plan?t={t}").json()["transfers"][0]["approved"]
+    assert client.post("/api/approve", json=dict(body, drug="nope")).status_code == 404
+    seen = []
+    monkeypatch.setattr(voice, "write_brief", lambda facts, language: seen.append((facts, language)) or dict(summary="s", next_step="n"))
+    assert client.get(f"/api/brief/{f}/{j}?t={t}&language=or").json() == dict(summary="s", next_step="n")
+    facts, language = seen[0]
+    assert language == "or" and facts["alarm"] and facts["phc"].startswith("PHC ")      # the names the UI shows
+    client.get(f"/api/brief/{f}/{j}?t={t}&language=or")
+    assert len(seen) == 1                                          # the same evidence never pays Gemini twice
+    assert client.get(f"/api/brief/{f}/{j}?t={t}&language=xx").status_code == 422
+    ledger.clear(), briefs.clear()

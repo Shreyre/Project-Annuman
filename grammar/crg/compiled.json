@@ -1,0 +1,206 @@
+{
+  "version": "compiled-gemini-3.7-flash",
+  "source_note": "Gemini-compiled from: stw_pneumonia.pdf, stw_hypertension.pdf, stw_uti.pdf, amb_anaemia_pregnancy.pdf, npcdcs_diabetes.pdf, nhsrc_cho_fever_diarrhoea.pdf",
+  "drugs": {
+    "amoxicillin_500": {
+      "unit": "cap"
+    },
+    "erythromycin_250": {
+      "unit": "cap"
+    },
+    "doxycycline_100": {
+      "unit": "cap"
+    },
+    "amlodipine_5": {
+      "unit": "tab"
+    },
+    "nitrofurantoin_100": {
+      "unit": "tab"
+    },
+    "trimethoprim_sulphamethoxazole_ds": {
+      "unit": "tab"
+    },
+    "fosfomycin_3g": {
+      "unit": "tab"
+    },
+    "norfloxacin_400": {
+      "unit": "tab"
+    },
+    "levofloxacin_250": {
+      "unit": "tab"
+    },
+    "ifa_tab": {
+      "unit": "tab"
+    },
+    "metformin_500": {
+      "unit": "tab"
+    },
+    "paracetamol_500": {
+      "unit": "tab"
+    },
+    "ors_sachet": {
+      "unit": "sachet"
+    }
+  },
+  "conditions": {
+    "pneumonia": {
+      "courses": [
+        {
+          "drug": "amoxicillin_500",
+          "share": 1.0,
+          "units_per_day": 3.0,
+          "days": 5,
+          "substitutes": [
+            {
+              "drug": "erythromycin_250",
+              "units_per_day": 4.0,
+              "days": 5
+            },
+            {
+              "drug": "doxycycline_100",
+              "units_per_day": 2.0,
+              "days": 5
+            }
+          ],
+          "citation": {
+            "source": "stw_pneumonia.pdf",
+            "page": 1,
+            "quote": "Without comorbidities: Cap. Amoxicillin (500 mg TDS) / Tab. Erythromycin 250mg QID/ Tab. Doxycycline 100mg BD"
+          }
+        }
+      ]
+    },
+    "hypertension": {
+      "courses": [
+        {
+          "drug": "amlodipine_5",
+          "share": 1.0,
+          "units_per_day": 1.0,
+          "days": 28,
+          "substitutes": [],
+          "citation": {
+            "source": "stw_hypertension.pdf",
+            "page": 1,
+            "quote": "If BP is high:* Prescribe Amlodipine 5mg After 4 weeks measure BP again."
+          }
+        }
+      ]
+    },
+    "uti": {
+      "courses": [
+        {
+          "drug": "nitrofurantoin_100",
+          "share": 1.0,
+          "units_per_day": 2.0,
+          "days": 5,
+          "substitutes": [
+            {
+              "drug": "trimethoprim_sulphamethoxazole_ds",
+              "units_per_day": 2.0,
+              "days": 3
+            },
+            {
+              "drug": "fosfomycin_3g",
+              "units_per_day": 1.0,
+              "days": 1
+            },
+            {
+              "drug": "norfloxacin_400",
+              "units_per_day": 2.0,
+              "days": 5
+            },
+            {
+              "drug": "levofloxacin_250",
+              "units_per_day": 2.0,
+              "days": 5
+            }
+          ],
+          "citation": {
+            "source": "stw_uti.pdf",
+            "page": 1,
+            "quote": "Nitrofurantoin 100 mg PO BD for 5 - 7 days"
+          }
+        }
+      ]
+    },
+    "anaemia_pregnancy": {
+      "courses": [
+        {
+          "drug": "ifa_tab",
+          "share": 1.0,
+          "units_per_day": 2.0,
+          "days": 30,
+          "substitutes": [],
+          "citation": {
+            "source": "amb_anaemia_pregnancy.pdf",
+            "page": 38,
+            "quote": "Two tablets of Iron and Folic Acid tablet (60 mg elemental Iron and 500 mcg Folic Acid) daily, orally given by the health provider during the ANC contact"
+          }
+        }
+      ]
+    },
+    "type2_diabetes": {
+      "courses": [
+        {
+          "drug": "metformin_500",
+          "share": 1.0,
+          "units_per_day": 2.0,
+          "days": 28,
+          "substitutes": [],
+          "citation": {
+            "source": "npcdcs_diabetes.pdf",
+            "page": 39,
+            "quote": "Metformin 500 mg twice daily"
+          }
+        }
+      ]
+    },
+    "fever": {
+      "courses": [
+        {
+          "drug": "paracetamol_500",
+          "share": 1.0,
+          "units_per_day": 4.0,
+          "days": 3,
+          "substitutes": [],
+          "citation": {
+            "source": "nhsrc_cho_fever_diarrhoea.pdf",
+            "page": 13,
+            "quote": "Give Tab. Paracetamol 500-650 mg oral stat (adult dose); may be repeated 6-8th hourly. For children give syrup paracetamol 15mg/kg/dose 6-8 hourly. This helps reduce the body temperature and provides relief to the patient."
+          }
+        }
+      ]
+    },
+    "acute_diarrhoea": {
+      "courses": [
+        {
+          "drug": "ors_sachet",
+          "share": 1.0,
+          "units_per_day": 2.0,
+          "days": 3,
+          "substitutes": [],
+          "citation": {
+            "source": "nhsrc_cho_fever_diarrhoea.pdf",
+            "page": 38,
+            "quote": "The minimum amount of ORS to provide for use at home per day for diarrhea patients with no dehydration ... >10 years ... 2000 ml/day"
+          }
+        }
+      ]
+    }
+  },
+  "rejected": [],
+  "skipped": [
+    {
+      "condition": "hypertension",
+      "drug": "amlodipine_5",
+      "source": "npcdcs_diabetes.pdf",
+      "why": "stw_hypertension.pdf already gives it"
+    },
+    {
+      "condition": "anaemia_pregnancy",
+      "drug": "ifa_tab",
+      "source": "nhsrc_cho_fever_diarrhoea.pdf",
+      "why": "amb_anaemia_pregnancy.pdf already gives it"
+    }
+  ]
+}

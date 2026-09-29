@@ -1,0 +1,159 @@
+{
+  "version": "compiled-gemini-3.7-flash",
+  "source_note": "Gemini-compiled from South Africa's Primary Healthcare STGs and EML, 8th edition (2024), https://www.health.gov.za/wp-content/uploads/2025/07/Primary-Healthcare-Standard-Treatment-Guidelines-and-Essential-Medicines-List-8th-Edition-2024.pdf: only the tracer sections, PDF pages 72-75, 115-124, 191-192, 259-261, 274-281, 297-299, 549-551, were sent. Citations give the page of the full PDF.",
+  "drugs": {
+    "paracetamol_500": {
+      "unit": "tab"
+    },
+    "amoxicillin_500": {
+      "unit": "tab"
+    },
+    "moxifloxacin_400": {
+      "unit": "tab"
+    },
+    "hydrochlorothiazide_12.5": {
+      "unit": "tab"
+    },
+    "metformin_500": {
+      "unit": "tab"
+    },
+    "gentamicin_160": {
+      "unit": "vial"
+    },
+    "fosfomycin_3g": {
+      "unit": "vial"
+    },
+    "nitrofurantoin_100": {
+      "unit": "vial"
+    },
+    "ferrous_sulfate_compound_bpc_170": {
+      "unit": "tab"
+    },
+    "ferrous_fumarate_200": {
+      "unit": "tab"
+    }
+  },
+  "conditions": {
+    "fever": {
+      "courses": [
+        {
+          "drug": "paracetamol_500",
+          "share": 1.0,
+          "units_per_day": 8.0,
+          "days": 2,
+          "substitutes": [],
+          "citation": {
+            "source": "Primary-Healthcare-Standard-Treatment-Guidelines-and-Essential-Medicines-List-8th-Edition-2024.pdf",
+            "page": 297,
+            "quote": "Paracetamol, oral, 500 mg to 1 g, 4 to 6 hourly as required (to a maximum of 4 g in 24 hours)."
+          }
+        }
+      ]
+    },
+    "pneumonia": {
+      "courses": [
+        {
+          "drug": "amoxicillin_500",
+          "share": 1.0,
+          "units_per_day": 6.0,
+          "days": 5,
+          "substitutes": [
+            {
+              "drug": "moxifloxacin_400",
+              "units_per_day": 1.0,
+              "days": 5
+            }
+          ],
+          "citation": {
+            "source": "Primary-Healthcare-Standard-Treatment-Guidelines-and-Essential-Medicines-List-8th-Edition-2024.pdf",
+            "page": 549,
+            "quote": "Amoxicillin, oral, 1 g 8 hourly for 5 days."
+          }
+        }
+      ]
+    },
+    "hypertension": {
+      "courses": [
+        {
+          "drug": "hydrochlorothiazide_12.5",
+          "share": 1.0,
+          "units_per_day": 1.0,
+          "days": 30,
+          "substitutes": [],
+          "citation": {
+            "source": "Primary-Healthcare-Standard-Treatment-Guidelines-and-Essential-Medicines-List-8th-Edition-2024.pdf",
+            "page": 121,
+            "quote": "Hydrochlorothiazide, oral, 12.5 mg daily."
+          }
+        }
+      ]
+    },
+    "type2_diabetes": {
+      "courses": [
+        {
+          "drug": "metformin_500",
+          "share": 1.0,
+          "units_per_day": 1.0,
+          "days": 30,
+          "substitutes": [],
+          "citation": {
+            "source": "Primary-Healthcare-Standard-Treatment-Guidelines-and-Essential-Medicines-List-8th-Edition-2024.pdf",
+            "page": 278,
+            "quote": "Metformin, oral, 500 mg daily with meals."
+          }
+        }
+      ]
+    },
+    "uti": {
+      "courses": [
+        {
+          "drug": "gentamicin_160",
+          "share": 1.0,
+          "units_per_day": 1.0,
+          "days": 1,
+          "substitutes": [
+            {
+              "drug": "fosfomycin_3g",
+              "units_per_day": 1.0,
+              "days": 1
+            },
+            {
+              "drug": "nitrofurantoin_100",
+              "units_per_day": 4.0,
+              "days": 5
+            }
+          ],
+          "citation": {
+            "source": "Primary-Healthcare-Standard-Treatment-Guidelines-and-Essential-Medicines-List-8th-Edition-2024.pdf",
+            "page": 260,
+            "quote": "Gentamicin, IM, 160 mg, as a single dose."
+          }
+        }
+      ]
+    },
+    "anaemia_pregnancy": {
+      "courses": [
+        {
+          "drug": "ferrous_sulfate_compound_bpc_170",
+          "share": 1.0,
+          "units_per_day": 2.0,
+          "days": 90,
+          "substitutes": [
+            {
+              "drug": "ferrous_fumarate_200",
+              "units_per_day": 2.0,
+              "days": 90
+            }
+          ],
+          "citation": {
+            "source": "Primary-Healthcare-Standard-Treatment-Guidelines-and-Essential-Medicines-List-8th-Edition-2024.pdf",
+            "page": 191,
+            "quote": "Ferrous sulfate compound BPC (dried), oral, 170 mg (± 55 mg elemental iron) 12 hourly with meals."
+          }
+        }
+      ]
+    }
+  },
+  "rejected": [],
+  "skipped": []
+}

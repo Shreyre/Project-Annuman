@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-DEFAULT = Path(__file__).resolve().parent.parent / "grammar" / "crg" / "tracer.json"
+DEFAULT = Path(__file__).resolve().parent.parent / "grammar" / "crg" / "compiled.json"
 CATS = ("full", "ration", "sub", "na")
 
 

@@ -6,7 +6,7 @@ views. One container: API + static UI.
 """
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -22,10 +22,20 @@ from anumaan.evaluate import evaluate
 
 THR = 0.7
 HORIZON = 14
-# The public demo link lets anyone trigger a paid Gemini call, so cap voice per day.
+# The public demo link lets anyone trigger a paid Gemini call (voice or brief), so cap them per day.
 # ponytail: per-process counter; with several Cloud Run instances each gets its own cap
-VOICE_CAP = int(os.environ.get("ANUMAAN_VOICE_DAILY_CAP", 200))
-voice_used = {}
+GEMINI_CAP = int(os.environ.get("ANUMAAN_GEMINI_DAILY_CAP", 200))
+gemini_used, briefs = {}, {}
+# Approved transfers, keyed (day, from, to, drug). ponytail: in memory and lost on restart;
+# a real deployment posts each order to the state's DVDMS instead
+ledger = {}
+
+
+def _spend():
+    today = date.today()
+    if gemini_used.get(today, 0) >= GEMINI_CAP:
+        raise HTTPException(429, "Gemini calls are used up for today on this demo. The buttons still work.")
+    gemini_used[today] = gemini_used.get(today, 0) + 1
 
 
 class Replay:
@@ -208,7 +218,77 @@ def plan(t: int):
     min-cost flow), escalations where moving stock cannot help, DVDMS-style orders."""
     run, obs = replay.run, replay.obs
     labels = PL.labels_at(_day(t), run, replay.post_d, obs, replay.cover_d)
-    return PL.plan(t, run, replay.post_d, labels, replay.coords, horizon=HORIZON, obs=obs, cover=replay.cover_d)
+    p = PL.plan(t, run, replay.post_d, labels, replay.coords, horizon=HORIZON, obs=obs, cover=replay.cover_d)
+    for x in p["transfers"]:
+        x["approved"] = (t, x["from_fac"], x["to_fac"], x["drug"]) in ledger
+    return p
+
+
+class Approve(BaseModel):
+    t: int
+    from_fac: str
+    to_fac: str
+    drug: str
+
+
+@app.post("/api/approve")
+def approve(a: Approve):
+    """The district officer's one click: a planned transfer becomes an issue order in the ledger."""
+    p = plan(a.t)
+    for x, order in zip(p["transfers"], p["orders"]):
+        key = (a.t, x["from_fac"], x["to_fac"], x["drug"])
+        if key == (a.t, a.from_fac, a.to_fac, a.drug):
+            return ledger.setdefault(key, dict(order, day=a.t, courses=x["courses"],
+                                               approved_at=datetime.now(timezone.utc).isoformat(timespec="seconds")))
+    raise HTTPException(404, "that transfer is not in the day's plan")
+
+
+@app.get("/api/ledger")
+def orders():
+    return list(ledger.values())
+
+
+def _place(fid):
+    """S0-W1-P5 -> the names the UI shows (app.js place()): State 1, Warehouse B, PHC 6."""
+    s, w, p = fid.split("-")
+    return dict(state=f"State {int(s[1:]) + 1}", warehouse=f"Warehouse {chr(65 + int(w[1:]))}", phc=f"PHC {int(p[1:]) + 1}")
+
+
+def _facts(t, f, j):
+    """What Anumaan knows about one PHC x medicine on day t, for the officer's brief."""
+    run, obs, d = replay.run, replay.obs, replay.drugs[j]
+    c, last, name = replay.cell(t, f, j, replay.labels(t), False), slice(max(0, t - 13), t + 1), run.ix["drugs"][d]
+    where = lambda fid: "{phc}, {warehouse}".format(**_place(fid))
+    moves = [dict(courses=x["courses"], from_phc=where(x["from_fac"]), to_phc=where(x["to_fac"]), minutes=x["minutes"])
+             for x in plan(t)["transfers"] if x["drug"] == name and run.facilities[f] in (x["from_fac"], x["to_fac"])]
+    return dict(medicine=name.replace("_", " "), **_place(run.facilities[f]), day=t,
+                register_units=c["book"], register_days_of_use=c["cover"],
+                inferred_shelf={"OK": "stocked", "SCARCE": "running short", "OUT": "empty"}[c["regime"]],
+                inferred_confidence=round(max(c["p"]), 2), days_of_use_left_deliveries_minus_dispensing=c["shadow"],
+                warning_line_days=FL.LOW, pharmacist_check=c["confirmed"], alarm=c["alarm"],
+                alarm_since_day=c.get("onset"), where_it_broke=c.get("level"), suggested_action=c.get("action"),
+                warehouse_indent_fill_rate=c.get("fill"), statewide_diagnosis_lift=c.get("lift"),
+                last_14_days={k: int(round(obs[o][last, f, d].sum())) for k, o in (
+                    ("courses_called_for", "N"), ("given_in_full", "full"), ("cut_short", "ration"),
+                    ("switched_to_substitute", "sub"), ("marked_not_available", "na"))},
+                planned_transfers=moves)
+
+
+@app.get("/api/brief/{f}/{j}")
+async def brief(f: int, j: int, t: int, language: str = "en"):
+    """Gemini turns the evidence for one PHC x medicine into a short brief for the district officer."""
+    _cell_ok(f, j)
+    if language not in voice.LANGUAGES:
+        raise HTTPException(422, f"language must be one of {', '.join(voice.LANGUAGES)}")
+    facts = _facts(_day(t), f, j)
+    key = (json.dumps(facts, sort_keys=True), language)     # the same evidence never pays twice
+    if key not in briefs:
+        _spend()
+        try:
+            briefs[key] = await run_in_threadpool(voice.write_brief, facts, language)
+        except voice.VoiceUnavailable as e:
+            raise HTTPException(503, str(e))
+    return briefs[key]
 
 
 @app.get("/api/national")
@@ -248,10 +328,7 @@ async def voice_confirm(request: Request, f: int, j: int, t: int, language: str 
     estimate exactly like the buttons. 503 when Gemini is not configured."""
     _cell_ok(f, j)
     _day(t)
-    today = date.today()
-    if voice_used.get(today, 0) >= VOICE_CAP:
-        raise HTTPException(429, "Voice answers are used up for today on this demo. Use the buttons.")
-    voice_used[today] = voice_used.get(today, 0) + 1
+    _spend()
     audio = await request.body()
     mime = request.headers.get("content-type", "audio/webm")
     try:   # label_voice blocks for up to 30 s; keep it off the event loop

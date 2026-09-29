@@ -21,13 +21,20 @@ The match is a min-cost flow (Google OR-Tools): integer courses, arcs only withi
 max_minutes of road AND inside one state (DVDMS indents and procurement run per
 state; a cross-state loan is the STATE-PROCUREMENT escalation, not a routine issue),
 as much need covered as possible at the fewest minutes x courses.
-Coordinates are SYNTHETIC and travel times a haversine estimate (see
-route_matrix_requests for the Google Maps Routes hook).
+Coordinates are SYNTHETIC. Travel times are real Google Maps Routes drive times between those
+points where road_minutes.json holds the map (seeds 5-9, so the demo's seed 5 too), else a
+straight-line estimate. The app only reads that file; fetch_road_minutes fills it.
 
     python -m anumaan.planner --seeds 5-9
+    python -m anumaan.planner --seeds 5-9 --fetch-routes   # first fetch missing maps (billed)
 """
 import argparse
+import json
+import time
 from collections import Counter
+from datetime import date
+from functools import cache
+from pathlib import Path
 
 import numpy as np
 from ortools.graph.python import min_cost_flow
@@ -55,6 +62,8 @@ DISCOUNT = 0.35
 # donor under an upstream failure has no resupply coming, which a one-day snapshot cannot score.
 ROAD, KMH = 1.4, 35          # road km per straight-line km, average rural van speed
 ROUTES_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
+PROJECT = "anumaan-c4c"
+ROAD_MINUTES = Path(__file__).with_name("road_minutes.json")
 
 
 def synthetic_coords(run, seed=0):
@@ -75,27 +84,89 @@ def synthetic_coords(run, seed=0):
 
 
 def travel_minutes(coords):
-    """[F, F] drive minutes: great-circle km x ROAD at KMH.
-    ponytail: straight-line estimate; with a Maps key configured, fill this matrix from
-    Routes computeRouteMatrix instead (route_matrix_requests builds the calls)."""
+    """[F, F] drive minutes. Real Google Maps road times for the arcs road_minutes.json holds
+    for exactly this map; every other pair, and every map it lacks, great-circle km x ROAD at
+    KMH. Reads a file, never calls Routes (the Cloud Run identity may not)."""
     lat, lon = np.radians(coords).T
     h = (np.sin((lat[:, None] - lat) / 2) ** 2
          + np.cos(lat)[:, None] * np.cos(lat) * np.sin((lon[:, None] - lon) / 2) ** 2)
-    return 2 * 6371 * np.arcsin(np.sqrt(h)) * ROAD / KMH * 60
+    m = 2 * 6371 * np.arcsin(np.sqrt(h)) * ROAD / KMH * 60
+    if (a := _road_arcs(coords)) is not None:
+        m[a[:, 0], a[:, 1]] = a[:, 2] / 60
+    return m
 
 
-def route_matrix_requests(coords, tile=25):
-    """STUB - builds, never sends. The Google Maps Routes computeRouteMatrix bodies that
-    would replace travel_minutes when an API key is configured. One request may carry at
-    most 625 elements (origins x destinations), so the F x F matrix goes in 25 x 25 tiles.
-    To go live: POST each body to ROUTES_URL with headers X-Goog-Api-Key: <key> and
-    X-Goog-FieldMask: originIndex,destinationIndex,duration,condition; every streamed
-    element with condition ROUTE_EXISTS sets minutes[o0 + originIndex, d0 + destinationIndex]
-    = duration seconds / 60. Returns [(o0, d0, body)]."""
+@cache
+def _road_maps():
+    """[(coords [F, 2], arcs [n, 4]: origin, destination, seconds, metres)] from ROAD_MINUTES."""
+    maps = json.loads(ROAD_MINUTES.read_text())["maps"].values() if ROAD_MINUTES.exists() else ()
+    return [(np.array(m["coords"]), np.array(m["arcs"], int).reshape(-1, 4)) for m in maps]
+
+
+def _road_arcs(coords):
+    """Cached arcs for this map, matched on its coordinates to within float noise between
+    machines (numpy's trig differs in the last bits across CPUs), else None."""
+    return next((a for c, a in _road_maps()
+                 if c.shape == np.shape(coords) and np.allclose(c, coords, rtol=0, atol=1e-6)), None)
+
+
+def route_matrix_requests(coords, want=None, limit=625):
+    """Google Maps Routes computeRouteMatrix bodies for the origin -> destination arcs in
+    want ([F, F] bool, default all): one origin per request, so no unwanted pair is billed,
+    and at most `limit` elements (origins x destinations, the per-request cap) in each.
+    Returns [(origin, [destination], body)]."""
+    want = np.ones((len(coords),) * 2, bool) if want is None else want
     wp = [{"waypoint": {"location": {"latLng": {"latitude": float(a), "longitude": float(b)}}}} for a, b in coords]
-    return [(o, d, {"origins": wp[o:o + tile], "destinations": wp[d:d + tile],
-                    "travelMode": "DRIVE", "routingPreference": "TRAFFIC_UNAWARE"})
-            for o in range(0, len(wp), tile) for d in range(0, len(wp), tile)]
+    return [(o, ds, {"origins": [wp[o]], "destinations": [wp[d] for d in ds],
+                     "travelMode": "DRIVE", "routingPreference": "TRAFFIC_UNAWARE"})
+            for o in range(len(wp)) for row in [np.flatnonzero(want[o]).tolist()]
+            for ds in (row[k:k + limit] for k in range(0, len(row), limit))]
+
+
+def _arcs(o, ds, elements):
+    """[origin, destination, seconds, metres] for each streamed element that found a road.
+    ROUTE_NOT_FOUND and per-element errors are left out: travel_minutes keeps the
+    straight-line estimate for those pairs."""
+    return [[o, ds[e.get("destinationIndex", 0)], round(float(e.get("duration", "0s")[:-1])), e.get("distanceMeters", 0)]
+            for e in elements if e.get("condition") == "ROUTE_EXISTS" and not e.get("status", {}).get("code")]
+
+
+def fetch_road_minutes(seeds):
+    """Add real Google Maps road times for each seed's SYNTHETIC map to ROAD_MINUTES. Maps it
+    already holds are skipped, so a re-run costs nothing. Asks only for the arcs plan can use
+    (one state, never a PHC to itself) as Compute Route Matrix Essentials (DRIVE,
+    TRAFFIC_UNAWARE, no traffic or tolls): 2 states x 18 x 17 = 612 elements a default map. Needs
+    application-default credentials and routes.googleapis.com on PROJECT. Offline tool: the app
+    never calls it."""
+    import google.auth
+    from google.auth.transport.requests import AuthorizedSession
+    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    s = AuthorizedSession(creds)
+    hdr = {"X-Goog-User-Project": PROJECT,
+           "X-Goog-FieldMask": "originIndex,destinationIndex,duration,distanceMeters,status,condition"}
+    data = {"about": "SYNTHETIC points (planner.synthetic_coords), REAL road times between them: Google Maps "
+                     "Routes computeRouteMatrix, DRIVE, TRAFFIC_UNAWARE. arcs: [origin, destination, seconds, "
+                     "metres], same-state pairs only; a pair missing here gets the straight-line estimate. "
+                     "Add maps: python -m anumaan.planner --seeds 5-9 --fetch-routes",
+            "maps": json.loads(ROAD_MINUTES.read_text())["maps"] if ROAD_MINUTES.exists() else {}}
+    for seed in seeds:
+        run = sim.simulate(seed=seed)
+        coords, st = synthetic_coords(run, seed), np.array(run.st)
+        if _road_arcs(coords) is not None:
+            continue
+        want = (st[:, None] == st) & ~np.eye(len(st), dtype=bool)
+        arcs = []
+        for o, ds, body in route_matrix_requests(coords, want):
+            while (r := s.post(ROUTES_URL, json=body, headers=hdr, timeout=60)).status_code == 429:
+                time.sleep(60)                          # Routes allows 3,000 matrix elements a minute
+            r.raise_for_status()
+            arcs += _arcs(o, ds, r.json())
+        n = int(want.sum())
+        data["maps"][str(seed)] = dict(fetched=date.today().isoformat(), elements=n, no_route=n - len(arcs),
+                                       coords=coords.tolist(), arcs=arcs)
+        ROAD_MINUTES.write_text(json.dumps(data))       # after every map: nothing paid for is lost
+        _road_maps.cache_clear()
+        print(f"seed {seed}: {n} elements asked, {n - len(arcs)} without a road route (straight line kept)")
 
 
 def labels_at(t, run, post, obs, cover=None):
@@ -269,6 +340,7 @@ def evaluate_plan(run, seed=0, days=range(35, 200, 7), horizon=14, reserve_days=
                          minutes=minutes / max(n, 1), need_met=got / max(need, 1), escalations=len(esc),
                          esc_state_national=float(np.mean([s for s, _ in esc])) if esc else float("nan"),
                          esc_any_upstream=float(np.mean([u for _, u in esc])) if esc else float("nan"))
+    res["real_roads"] = _road_arcs(coords) is not None
     return res
 
 
@@ -284,10 +356,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="5-9", help="held-out seeds, e.g. 5-9 or 0,3")
     ap.add_argument("--behaviour", default="default", choices=sorted(sim.BEHAVIOUR))
+    ap.add_argument("--fetch-routes", action="store_true",
+                    help="first add real road times for these seeds' maps to road_minutes.json (billed Routes calls)")
     a = ap.parse_args()
     seeds = (list(range(int(a.seeds.split("-")[0]), int(a.seeds.split("-")[1]) + 1)) if "-" in a.seeds
              else [int(s) for s in a.seeds.split(",")])
+    if a.fetch_routes:
+        fetch_road_minutes(seeds)
     rs = [evaluate_plan(sim.simulate(seed=s, behaviour=a.behaviour), seed=s) for s in seeds]
+    real = ",".join(str(s) for s, r in zip(seeds, rs) if r["real_roads"]) or "none"
     print(f"SYNTHETIC redistribution plans - seeds {a.seeds}, behaviour '{a.behaviour}', a plan every 7 days "
           f"from day 35; horizon 14d, reserve 14d, same-state arcs <= 180 min; donors counted at "
           f"{SHADOW_TRUST} of their shadow stock (register baseline: {DISCOUNT} of the register)")
@@ -308,7 +385,8 @@ def main():
           "  state or country. It barely moves these one-day scores; it stays because such a donor has no resupply\n"
           "  coming (see SHADOW_TRUST).\n"
           "  Not claimed: plans are never applied to the simulated world, so courses/run sums independent weekly\n"
-          "  plans that re-plan the same shortages; minutes are straight-line estimates on SYNTHETIC maps.")
+          "  plans that re-plan the same shortages. Maps are SYNTHETIC: minutes are real Google Maps road times\n"
+          f"  between their points for seeds {real} (road_minutes.json), straight-line estimates otherwise.")
 
 
 if __name__ == "__main__":

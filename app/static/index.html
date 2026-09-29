@@ -4,91 +4,124 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Anumaan: the shelf behind the register</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23be2830'/%3E%3Cpath d='M3 5h10M3 8h10M3 11h6' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E">
+<meta name="description" content="Anumaan reads medicine stock-outs from the care already being recorded, where the stock register hides them. Synthetic network demonstration.">
+<title>Anumaan · Overview</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233a3e9e'/%3E%3Cpath d='M8 11h16M8 16h16M8 21h10' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M6 24 26 8' stroke='%23ff6b6b' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Odia:wght@500;600&family=Kalam:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="intro">
-<header class="top shell">
-  <a class="brand" href="./" aria-label="Anumaan, home">
-    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M7 11h18M7 16h18M7 21h11"/><path class="cut" d="M5 23 27 8"/></svg>
-    <span class="word">Anumaan</span>
+<a class="skip-link" href="#main">Skip to content</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></symbol>
+  <symbol id="i-left" viewBox="0 0 20 20"><path d="m12 5-5 5 5 5"/></symbol>
+  <symbol id="i-right" viewBox="0 0 20 20"><path d="m8 5 5 5-5 5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></symbol>
+</svg>
+
+<header class="top">
+  <a class="brand" href="#overview" aria-label="Anumaan, overview">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M8 11h16M8 16h16M8 21h10"/><path class="cut" d="M6 24 26 8"/></svg>
+    <span>Anumaan</span>
   </a>
-  <p class="tagline">The register says it's on the shelf. The care says otherwise.</p>
-  <p class="stamp" title="All facilities, patients and stock in this demo are simulated.">Synthetic data</p>
+  <nav class="tabs" aria-label="Main navigation">
+    <a href="#overview" data-view="overview" aria-current="page">Overview</a>
+    <a href="#transfers" data-view="transfers">Redistribution <span id="moveCount" class="count">–</span></a>
+    <a href="#national-view" data-view="national-view">National view</a>
+    <a href="#validation" data-view="validation">Performance</a>
+  </nav>
+  <div class="top-end">
+    <span class="synthetic" title="Every facility, patient and stock level here is simulated."><i aria-hidden="true"></i>Synthetic data</span>
+    <button id="help" class="icon-button round" type="button" aria-label="How Anumaan works">?</button>
+  </div>
 </header>
 
-<section class="hero shell" aria-live="polite">
-  <p id="phantomLine" class="headline"></p>
-</section>
-
-<section class="bar" aria-label="Replay controls">
-  <div class="bar-in shell">
-    <button id="play" class="play" type="button" aria-pressed="false">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path class="i-play" d="M6 4.5v11l9-5.5z"/><path class="i-pause" d="M5.5 4.5h3v11h-3zM11.5 4.5h3v11h-3z"/></svg>
-      <span>Play</span>
-    </button>
-    <label class="day" for="day"><span>Day</span> <output id="dayOut">0</output> <span class="of">of <span id="dayMax">199</span></span></label>
-    <input id="day" type="range" min="0" max="199" value="0">
-    <label class="switch"><input id="truth" type="checkbox" role="switch"><span class="track" aria-hidden="true"></span>Show ground truth</label>
-  </div>
-</section>
-
-<main class="layout shell">
-  <section class="network" aria-labelledby="netTitle">
-    <div class="net-head">
-      <h2 id="netTitle">The network today</h2>
-      <ul class="legend" id="legend">
-        <li><i class="sw ok"></i>Stocked <b data-k="ok">0</b></li>
-        <li><i class="sw scarce"></i>Running short <b data-k="scarce">0</b></li>
-        <li><i class="sw out"></i>Empty <b data-k="out">0</b></li>
-        <li><i class="sw out phantom"></i>Empty, register still shows stock <b data-k="phantom">0</b></li>
-      </ul>
-    </div>
-    <div id="grid" class="states"></div>
-    <p class="grid-hint">Select any square to see why Anumaan thinks what it thinks.</p>
+<main id="main" tabindex="-1">
+  <section class="replay" aria-label="Replay controls">
+    <button id="play" class="play" type="button" aria-pressed="false" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path class="i-play" d="M6 4.5v11l9-5.5z"/><path class="i-pause" d="M5.5 4.5h3v11h-3zM11.5 4.5h3v11h-3z"/></svg><span>Play</span></button>
+    <label class="day" for="day">Day <output id="dayOut">–</output><span class="of">of <span id="dayMax">199</span></span></label>
+    <span class="range"><span class="range-fill" aria-hidden="true"></span><span class="range-thumb" aria-hidden="true"></span><input id="day" type="range" min="0" max="199" value="0" disabled></span>
+    <label class="switch"><input id="truth" type="checkbox" role="switch" disabled><span class="track" aria-hidden="true"></span>Ground truth</label>
   </section>
 
-  <aside class="detail" id="detail" aria-live="polite" tabindex="-1">
-    <p class="hint">Select a PHC and medicine to see why Anumaan thinks what it thinks.</p>
-  </aside>
+  <div class="page-heading">
+    <div><h1 id="pageTitle">Network overview</h1><p id="pageDescription">The register says it’s on the shelf. The care says otherwise.</p></div>
+    <span id="networkSize" class="scope-label">Connecting to the network…</span>
+  </div>
+  <div id="loadError" class="error-banner" role="alert" hidden><span></span><button id="retry" class="button" type="button">Try again</button></div>
+
+  <section id="overview" class="view" aria-label="Network overview">
+    <div class="metrics" id="legend" role="group" aria-label="Medicine availability. Select one to filter the list.">
+      <button type="button" class="metric priority" data-status="phantom" aria-pressed="false"><span class="metric-label"><i class="sw out phantom"></i>Hidden stock-outs</span><strong data-k="phantom">–</strong><span class="metric-note">Register shows stock, care says empty</span></button>
+      <button type="button" class="metric" data-status="OUT" aria-pressed="false"><span class="metric-label"><i class="sw out"></i>Empty shelves</span><strong data-k="out">–</strong><span class="metric-note">Including hidden stock-outs</span></button>
+      <button type="button" class="metric" data-status="SCARCE" aria-pressed="false"><span class="metric-label"><i class="sw scarce"></i>Running short</span><strong data-k="scarce">–</strong><span class="metric-note">Courses being cut short</span></button>
+      <button type="button" class="metric" data-status="OK" aria-pressed="false"><span class="metric-label"><i class="sw ok"></i>Stocked</span><strong data-k="ok">–</strong><span class="metric-note">Care and supply agree</span></button>
+    </div>
+
+    <div class="insight">
+      <span class="insight-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 11h16M8 16h16M8 21h10"/><path class="cut" d="M6 24 26 8" pathLength="1"/></svg></span>
+      <div><strong>Look beyond the register</strong><p id="phantomLine">Connecting care records to medicine availability…</p></div>
+      <button id="reviewHidden" class="button" type="button" disabled>Review hidden stock-outs</button>
+    </div>
+
+    <div class="layout">
+      <section class="network panel" aria-labelledby="netTitle">
+        <div class="panel-heading">
+          <div><h2 id="netTitle">Facility signals</h2><p>Most urgent first: hidden stock-outs, then empty, then short.</p></div>
+          <div class="segmented" role="group" aria-label="Signal display"><button type="button" data-display="list" aria-pressed="true">List</button><button type="button" data-display="matrix" aria-pressed="false">Matrix</button></div>
+        </div>
+        <div class="filters">
+          <label class="search"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="search" type="search" placeholder="Search a facility or medicine" aria-label="Search a facility or medicine"></label>
+          <select id="stateFilter" aria-label="Filter by state"><option value="">All states</option></select>
+          <select id="statusFilter" aria-label="Filter by availability"><option value="">All statuses</option><option value="phantom">Hidden stock-outs</option><option value="OUT">Empty</option><option value="SCARCE">Running short</option><option value="OK">Stocked</option></select>
+        </div>
+        <div id="signalList" aria-busy="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+        <div id="grid" class="states" hidden></div>
+        <div class="list-footer">
+          <span id="resultCount" role="status">Loading facility signals…</span>
+          <div id="pagination"><button id="prevPage" class="icon-button" type="button" aria-label="Previous page" disabled><svg aria-hidden="true"><use href="#i-left"/></svg></button><span id="pageNumber">1</span><button id="nextPage" class="icon-button" type="button" aria-label="Next page" disabled><svg aria-hidden="true"><use href="#i-right"/></svg></button></div>
+        </div>
+        <p class="grid-hint"><span><i class="sw ok"></i>Stocked</span><span><i class="sw scarce"></i>Running short</span><span><i class="sw out"></i>Empty</span><span><i class="sw out phantom"></i>Empty, register still shows stock</span></p>
+      </section>
+      <aside class="detail panel" id="detail" tabindex="-1" aria-label="Selected signal" aria-busy="true"><div class="panel-heading"><h2>Selected signal</h2></div><div class="detail-content"><p class="hint">Loading medicine availability and care evidence…</p><div class="skeleton"></div><div class="skeleton"></div></div></aside>
+    </div>
+    <p class="section-footnote">Availability is inferred for every facility and medicine. Confirm important signals with a pharmacist’s shelf check.</p>
+  </section>
+
+  <section id="transfers" class="view panel rail" hidden aria-labelledby="movesTitle">
+    <div class="panel-heading"><div><h2 id="movesTitle">Recommended transfers</h2><p>Treatment courses moved from nearby PHCs that have stock to spare.</p></div><span class="tag">Same-state routes</span></div>
+    <p class="section-note">Donors must have been calm all week and within three hours by road. State and national shortages are escalated instead, because moving stock cannot fix them. Nothing moves until an officer approves it.</p>
+    <div id="moves" class="rail-body"></div>
+  </section>
+  <section id="national-view" class="view panel rail" hidden aria-labelledby="natTitle">
+    <div class="panel-heading"><div><h2 id="natTitle">What the national view sees</h2><p>Supply patterns across state lines, without moving any care record.</p></div><span class="tag">Counts only</span></div>
+    <p class="section-note">Diagnoses and slips stay inside each state. Only district and medicine counts are shared, and any group of fewer than five PHCs is suppressed.</p>
+    <div id="national" class="rail-body"></div>
+  </section>
+  <section id="validation" class="view panel rail" hidden aria-labelledby="proofTitle">
+    <div class="panel-heading"><div><h2 id="proofTitle">How well it works</h2><p>Anumaan against the register and dispensing baselines.</p></div><span class="tag">Synthetic evaluation</span></div>
+    <p class="section-note">Scored against the simulator’s hidden ground truth on a held-out seed. A catch is an alarm up to three weeks before the shelf empties. Not yet validated on real patient data.</p>
+    <div class="rail-body"><div class="scroll"><table id="proof" class="data proof"></table></div><p id="triageNote" class="note"></p></div>
+  </section>
+
+  <footer class="foot"><span class="footer-brand">Anumaan is a synthetic replay, not a live clinical or inventory system.</span><p id="grammarNote"></p></footer>
 </main>
 
-<section class="rail shell" aria-labelledby="movesTitle">
-  <div class="rail-head">
-    <h2 id="movesTitle">What to move today</h2>
-    <p class="note">Planned in treatment courses from PHCs that have been calm all week, only within the same state and three hours by road. Where the shortage runs statewide or national, moving stock around cannot fix it, so it is escalated instead.</p>
-  </div>
-  <div id="moves" class="rail-body"></div>
-</section>
-
-<section class="rail shell" aria-labelledby="natTitle">
-  <div class="rail-head">
-    <h2 id="natTitle">What the national view sees</h2>
-    <p class="note">Each state keeps its own diagnoses and slips. Only counts per district and medicine cross the state line, and any group of fewer than five PHCs is suppressed.</p>
-  </div>
-  <div id="national" class="rail-body"></div>
-</section>
-
-<section class="rail shell" aria-labelledby="proofTitle">
-  <div class="rail-head">
-    <h2 id="proofTitle">How well it works</h2>
-    <p class="note">Scored against the simulator's hidden ground truth. A catch is an alarm up to three weeks before the shelf empties.</p>
-  </div>
-  <div class="rail-body">
-    <div class="scroll"><table id="proof" class="data proof"></table></div>
-    <p id="triageNote" class="note"></p>
-  </div>
-</section>
-
-<footer class="foot shell">
-  <p id="grammarNote"></p>
-</footer>
-
-<div id="tip" class="tip" aria-hidden="true" hidden></div>
-<script src="app.js?v=5"></script>
+<dialog id="guide" aria-labelledby="guideTitle">
+  <div class="dialog-heading"><span class="dialog-kicker">How Anumaan works</span><button id="closeGuide" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <h2 id="guideTitle">The register says it’s on the shelf. The care says otherwise.</h2>
+  <p>When a medicine runs out, patients are still diagnosed. Courses get cut short, substitutes appear, and slips say “not available”. Anumaan reads those traces to find the stock-outs a register misses.</p>
+  <ol class="guide-steps">
+    <li><strong>Spot a signal</strong><span>Start with the hidden stock-outs, or search any facility and medicine.</span></li>
+    <li><strong>Read the evidence</strong><span>Compare the register with the care, the forecast, beds and staff.</span></li>
+    <li><strong>Confirm and act</strong><span>Record the pharmacist’s shelf check, then approve transfers or escalate.</span></li>
+  </ol>
+  <p class="note">A synthetic replay of 200 days. Turn on ground truth to see what the simulator hid.</p>
+  <button id="startExploring" class="button primary" type="button">Explore the network</button>
+</dialog>
+<div id="tip" class="tip" aria-hidden="true" hidden></div><div id="toast" class="toast" role="status" hidden></div>
+<script src="app.js?v=7"></script>
 </body>
 </html>

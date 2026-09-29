@@ -7,6 +7,9 @@ empty / available / unclear, the cause if they gave one, what they said and its
 English translation. Only "empty" and "available" are evidence for the filter;
 "unclear" means ask again or tap the button.
 
+The same Gemini client writes the district officer's brief for an alarm (write_brief):
+the evidence in two or three sentences and a next step, in English, Odia, Hindi or Malayalam.
+
     python -m anumaan.voice answer.webm --drug amoxicillin_500 [--language or]
 
 Needs GOOGLE_GENAI_USE_VERTEXAI=true, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION
@@ -31,7 +34,9 @@ CAUSES = ("indent_pending", "warehouse_short", "expired_or_damaged", "demand_up"
           "not_prescribed", "other", "unknown")
 MAX_BYTES = 8 << 20      # a spoken answer is seconds long; refuse anything this big
 # google-genai's default is no timeout and no retries: a stalled connection blocks forever.
-# ponytail: one attempt, 30 s; add HttpOptions(retry_options=...) if 429s show up in the field
+# Vertex's shared Gemini quota answers 429 in bursts (seen on this project), so a 429 gets
+# two more tries, 2 s apart then 4 s; everything else fails fast.
+RETRY = types.HttpRetryOptions(attempts=3, initialDelay=2, maxDelay=8, httpStatusCodes=[429])
 TIMEOUT_MS = 30_000
 # ponytail: the model's self-reported confidence is uncalibrated; calibrate this cut
 # on labelled clips per language before trusting it
@@ -91,21 +96,14 @@ def _client():
         raise VoiceUnavailable(_HOWTO.format(why=type(e).__name__)) from e
 
 
-def label_voice(audio: bytes, mime: str, drug: str, language: str | None = None, client=None) -> dict:
-    """One spoken answer -> dict(answer, cause, transcript, transcript_en, language, confidence)."""
-    mime = mime.split(";")[0].strip().lower()     # browsers send "audio/webm;codecs=opus"
-    if not audio or len(audio) > MAX_BYTES or not mime.startswith("audio/"):
-        raise ValueError(f"need an audio/* clip under {MAX_BYTES >> 20} MB, got {mime} ({len(audio)} bytes)")
-    client = client or _client()
-    hint = f" They were expected to speak {language}." if language else ""
+def _generate(client, contents, schema):
+    """One JSON-schema Gemini call; every way of getting no answer becomes VoiceUnavailable."""
     try:
-        resp = client.models.generate_content(
-            model=os.environ.get("ANUMAAN_MODEL", "gemini-3.7-flash"),
-            contents=[types.Part.from_bytes(data=audio, mime_type=mime),
-                      PROMPT.format(drug=drug.replace("_", " "), hint=hint)],
+        return client.models.generate_content(
+            model=os.environ.get("ANUMAAN_MODEL", "gemini-3.7-flash"), contents=contents,
             config=types.GenerateContentConfig(response_mime_type="application/json",
-                                               response_schema=Answer, temperature=0,
-                                               http_options=types.HttpOptions(timeout=TIMEOUT_MS)))
+                                               response_schema=schema, temperature=0,
+                                               http_options=types.HttpOptions(timeout=TIMEOUT_MS, retry_options=RETRY)))
     except GoogleAuthError as e:
         raise VoiceUnavailable(_HOWTO.format(why=type(e).__name__)) from e
     except errors.APIError as e:     # the original error stays chained for the logs
@@ -115,6 +113,16 @@ def label_voice(audio: bytes, mime: str, drug: str, language: str | None = None,
         raise VoiceUnavailable(f"Gemini call failed ({e.code} {e.status}): {e.message}") from e
     except httpx.TransportError as e:     # timeouts, refused or dropped connections
         raise VoiceUnavailable(f"Gemini did not answer ({type(e).__name__}, limit {TIMEOUT_MS // 1000} s)") from e
+
+
+def label_voice(audio: bytes, mime: str, drug: str, language: str | None = None, client=None) -> dict:
+    """One spoken answer -> dict(answer, cause, transcript, transcript_en, language, confidence)."""
+    mime = mime.split(";")[0].strip().lower()     # browsers send "audio/webm;codecs=opus"
+    if not audio or len(audio) > MAX_BYTES or not mime.startswith("audio/"):
+        raise ValueError(f"need an audio/* clip under {MAX_BYTES >> 20} MB, got {mime} ({len(audio)} bytes)")
+    hint = f" They were expected to speak {language}." if language else ""
+    resp = _generate(client or _client(), [types.Part.from_bytes(data=audio, mime_type=mime),
+                                           PROMPT.format(drug=drug.replace("_", " "), hint=hint)], Answer)
     try:
         out = Answer.model_validate(resp.parsed).model_dump()
     except ValidationError:     # off-schema or empty reply: never guess a shelf state
@@ -124,6 +132,35 @@ def label_voice(audio: bytes, mime: str, drug: str, language: str | None = None,
     if out["confidence"] < MIN_CONFIDENCE:
         out["answer"] = "unclear"
     return out
+
+
+LANGUAGES = {"en": "English", "or": "Odia", "hi": "Hindi", "ml": "Malayalam"}
+
+BRIEF = """You brief a District Health Officer in India about one medicine at one Primary
+Health Centre. Anumaan infers the real shelf from the care being given (diagnoses, dispensing
+slips, the stock register and the warehouse ledger); the facts below are its output on
+SYNTHETIC demo data. Write in {language}:
+- summary: two or three plain sentences: what is happening, and the evidence for it.
+- next_step: one sentence: what the officer should do now.
+Use only these facts. Do not invent numbers, names or dates; keep medicine and facility ids
+as written.
+FACTS: {facts}"""
+
+
+class Brief(BaseModel):
+    summary: str
+    next_step: str
+
+
+def write_brief(facts: dict, language: str = "en", client=None) -> dict:
+    """Anumaan's evidence for one PHC x medicine -> dict(summary, next_step) in the officer's language."""
+    if language not in LANGUAGES:
+        raise ValueError(f"language must be one of {', '.join(LANGUAGES)}")
+    resp = _generate(client or _client(), [BRIEF.format(language=LANGUAGES[language], facts=json.dumps(facts))], Brief)
+    try:
+        return Brief.model_validate(resp.parsed).model_dump()
+    except ValidationError as e:     # never show a half-formed brief
+        raise VoiceUnavailable("Gemini returned no usable brief") from e
 
 
 if __name__ == "__main__":
