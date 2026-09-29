@@ -37,20 +37,22 @@ def entry_gaps(given, expected, frac=0.25):
     return given < frac * expected
 
 
-def filter_series(N, cats, book, exp_units, receipts, skip=None, tau=None, warmup=30, confirm=None):
+def filter_series(N, cats, book, exp_units, receipts, skip=None, tau=None, warmup=30, confirm=None, rho=None):
     """Forward-filter one facility x drug.
 
     N: expected courses/day from diagnoses; cats: [T, 4] full/ration/sub/na counts;
     book: register balance; exp_units: expected units/day; receipts: units received;
     skip: [T] bool, days whose slips are missing (see entry_gaps) - no care evidence;
     tau: trust in the register, learned from the warm-up window when None;
-    confirm: {day: "empty" | "available"} shelf checks by the pharmacist.
+    confirm: {day: "empty" | "available"} shelf checks by the pharmacist;
+    rho: local prescribing rate vs the guideline, learned from the warm-up window when
+    None (a new facility can take the national prior instead - see federation).
     Returns the regime posterior [T, 3].
     """
     ok = np.ones(len(N), bool) if skip is None else ~skip
-    # local prescribing rate vs the guideline, learned on the warm-up window; the 1.2 cap
-    # bounds the damage when diagnosis capture was patchier during warm-up than after
-    rho = np.clip(cats[:warmup][ok[:warmup]].sum() / max(N[:warmup][ok[:warmup]].sum(), 1e-9), 0.3, 1.2)
+    if rho is None:   # learned on the warm-up window; the 1.2 cap bounds the damage when
+        # diagnosis capture was patchier during warm-up than after
+        rho = np.clip(cats[:warmup][ok[:warmup]].sum() / max(N[:warmup][ok[:warmup]].sum(), 1e-9), 0.3, 1.2)
     if tau is None:   # how well the register's daily drawdown tracked CRG-implied use
         drawn = receipts[1:warmup] - np.diff(book[:warmup])
         use_w = (rho * exp_units)[1:warmup]

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Kalam:wght@400&family=Noto+Sans+Oriya:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 <header class="top">
@@ -46,6 +46,18 @@
   </aside>
 </main>
 
+<section class="band" aria-labelledby="movesTitle">
+  <h2 id="movesTitle">What to move today</h2>
+  <p class="proof-note">Planned in treatment courses from PHCs that have been calm all week, only within the same state and three hours by road. Where the shortage runs statewide or national, moving stock around cannot fix it, so it is escalated instead.</p>
+  <div id="moves"></div>
+</section>
+
+<section class="band" aria-labelledby="natTitle">
+  <h2 id="natTitle">What the national view sees</h2>
+  <p class="proof-note">Each state keeps its own diagnoses and slips. Only counts per district and medicine cross the state line, and any group of fewer than five PHCs is suppressed.</p>
+  <div id="national"></div>
+</section>
+
 <section class="proof" aria-labelledby="proofTitle">
   <h2 id="proofTitle">How well it works</h2>
   <p class="proof-note">Scored against the simulator's hidden ground truth. A catch is an alarm up to three weeks before the shelf empties.</p>
@@ -56,6 +68,6 @@
 <footer class="foot">
   <p id="grammarNote"></p>
 </footer>
-<script src="app.js"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

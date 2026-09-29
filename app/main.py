@@ -1,21 +1,31 @@
 """Anumaan demo service: replays a SYNTHETIC PHC network through the filter and
-serves the Counter Truth and supply-tree views. One container: API + static UI.
+serves the Counter Truth, beds and staff, forecast, redistribution and national
+views. One container: API + static UI.
 
     uvicorn app.main:app --reload
 """
+import json
 import os
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
-from anumaan import crg as G, filter as FL, sim, triage
+from anumaan import care as CARE, crg as G, federation as FED, filter as FL, forecast as FC
+from anumaan import planner as PL, sim, triage, voice
 from anumaan.evaluate import evaluate
 
 THR = 0.7
+HORIZON = 14
+# The public demo link lets anyone trigger a paid Gemini call, so cap voice per day.
+# ponytail: per-process counter; with several Cloud Run instances each gets its own cap
+VOICE_CAP = int(os.environ.get("ANUMAAN_VOICE_DAILY_CAP", 200))
+voice_used = {}
 
 
 class Replay:
@@ -23,6 +33,7 @@ class Replay:
     view at day t only ever reflects data up to day t."""
 
     def __init__(self, seed):
+        self.seed = seed
         self.run = run = sim.simulate(seed=seed)
         self.obs = obs = G.aggregate(run.ix, run.dx, run.slips, run.na)
         self.drugs = P = list(run.ix["primaries"])
@@ -36,6 +47,14 @@ class Replay:
         for f in range(F):
             for j in range(J):
                 self.refilter(f, j)
+        # views onto self.post keyed by drug index, as the planner expects; refilter writes in place
+        self.post_d = {(f, d): self.post[:, f, j] for f in range(F) for j, d in enumerate(P)}
+        self.coords = PL.synthetic_coords(run, seed)
+        self.out_mask = (obs["na"] > 0) | (obs["sub"] > 0) | (obs["units"] == 0)
+        self.care = CARE.simulate(run, seed)
+        self.beds, self.staff = CARE.beds(self.care), CARE.staff(self.care)
+        self.nodes = [FED.StateNode(run, s) for s in sorted(set(run.st))]
+        self.raw_rows = {n.state: len(n.slips) + len(n.na) + int((n.dx > 0).sum()) for n in self.nodes}
         self.metrics = evaluate(run)
 
     def refilter(self, f, j):
@@ -93,6 +112,11 @@ def _cell_ok(f, j):
         raise HTTPException(404, "no such facility/medicine")
 
 
+def _num(x):
+    """JSON-safe float: NaN (e.g. no forecast band yet) becomes null."""
+    return None if x is None or np.isnan(x) else round(float(x), 1)
+
+
 @app.get("/api/meta")
 def meta():
     run, crg = replay.run, G.load()
@@ -101,10 +125,10 @@ def meta():
     t0 = int(ph.sum((1, 2)).argmax())
     f0, j0 = map(int, np.argwhere(ph[t0])[0]) if ph[t0].any() else (0, 0)
     return dict(days=DAYS, synthetic=True, grammar=crg["version"], grammar_note=crg["source_note"],
-                start=dict(day=t0, f=f0, j=j0),
+                start=dict(day=t0, f=f0, j=j0), horizon=HORIZON,
                 facilities=[dict(id=i, wh=w, st=s) for i, w, s in zip(run.facilities, run.wh, run.st)],
                 drugs=[dict(name=run.ix["drugs"][d], unit=crg["drugs"][run.ix["drugs"][d]]["unit"]) for d in replay.drugs],
-                levels=triage.LEVELS, actions=triage.ACTION)
+                cadres=CARE.CADRES, levels=triage.LEVELS, actions=triage.ACTION)
 
 
 @app.get("/api/day/{t}")
@@ -132,6 +156,62 @@ def series(f: int, j: int, t: int, truth: bool = False):
     return out
 
 
+@app.get("/api/forecast/{f}/{j}")
+def forecast(f: int, j: int, t: int):
+    """Next HORIZON days of units: from diagnoses through the CRG, and the fair
+    consumption baseline (dispensing with out-days filled from the in-stock rate)."""
+    _cell_ok(f, j)
+    _day(t)
+    obs, d = replay.obs, replay.drugs[j]
+    mean, lo, hi = FC.forecast_series(obs["exp_units"][:t + 1, f, d], HORIZON)
+    adj = FC.adjust_consumption(obs["units"][:, f, d], replay.out_mask[:, f, d], t)
+    cons = FC.forecast_series(adj[:t + 1], HORIZON)[0]
+    return dict(days=list(range(t + 1, t + 1 + HORIZON)), mean=[_num(x) for x in mean],
+                lo=[_num(x) for x in lo], hi=[_num(x) for x in hi],
+                total=round(float(mean.sum())), consumption_total=round(float(cons.sum())))
+
+
+@app.get("/api/facility/{f}")
+def facility(f: int, t: int, truth: bool = False):
+    """Beds from the ADT feed and staff from attendance + acts, for one PHC on day t."""
+    _cell_ok(f, 0)
+    c, b, s = replay.care, replay.beds, replay.staff
+    early = b["early"][_day(t), f]
+    out = dict(beds=dict(capacity=int(c.capacity[f]), occupied=int(b["occupied"][t, f]),
+                         free=int(c.capacity[f] - b["occupied"][t, f]), pressure=bool(b["pressure"][t, f]),
+                         early_share_7d=None if np.isnan(early) else round(float(early), 2)),
+               staff=[dict(cadre=k, sanctioned=int(CARE.SANCTIONED[i]), in_position=int(c.in_position[f, i]),
+                           marked_present=bool(c.marked[t, f, i]), p_present=round(float(s["p_present"][t, f, i]), 2),
+                           acts=int(c.acts[t, f, i]), expected=round(float(s["expected"][t, f, i]), 1),
+                           verify=bool(s["verify"][t, f, i]))
+                      for i, k in enumerate(CARE.CADRES)])
+    if truth:
+        out["beds"]["true_occupied"] = int(c.occupancy[t, f])
+        for i, row in enumerate(out["staff"]):
+            row["true_present"] = bool(c.present[t, f, i])
+    return out
+
+
+@app.get("/api/plan")
+def plan(t: int):
+    """Redistribution for day t: same-state transfers in treatment courses (OR-Tools
+    min-cost flow), escalations where moving stock cannot help, DVDMS-style orders."""
+    run, obs = replay.run, replay.obs
+    labels = PL.labels_at(_day(t), run, replay.post_d, obs)
+    return PL.plan(t, run, replay.post_d, labels, replay.coords, horizon=HORIZON, obs=obs)
+
+
+@app.get("/api/national")
+def national(t: int):
+    """What the national project sees: each state's export through the clean-room gate."""
+    nat = FED.National()
+    exports = [n.export(_day(t)) for n in replay.nodes]
+    for ex in exports:
+        nat.ingest(ex)                  # raises if an export carries anything raw
+    return dict(exports=exports, view=nat.view(), priors=nat.priors(), raw_rows=replay.raw_rows,
+                export_bytes={ex["state"]: len(json.dumps(ex)) for ex in exports})
+
+
 class Confirm(BaseModel):
     f: int
     j: int
@@ -139,13 +219,41 @@ class Confirm(BaseModel):
     answer: Literal["empty", "available"]
 
 
+def _apply(f, j, t, answer):
+    replay.confirm.setdefault((f, j), {})[t] = answer
+    replay.refilter(f, j)
+    return replay.post[t, f, j].round(3).tolist()
+
+
 @app.post("/api/confirm")
 def confirm(c: Confirm):
     """A pharmacist's shelf check becomes evidence for that day; only this series is re-filtered."""
     _cell_ok(c.f, c.j)
-    replay.confirm.setdefault((c.f, c.j), {})[_day(c.t)] = c.answer
-    replay.refilter(c.f, c.j)
-    return dict(ok=True, p=replay.post[c.t, c.f, c.j].round(3).tolist())
+    return dict(ok=True, p=_apply(c.f, c.j, _day(c.t), c.answer))
+
+
+@app.post("/api/voice")
+async def voice_confirm(request: Request, f: int, j: int, t: int, language: str | None = None):
+    """A spoken shelf check: Gemini transcribes and labels it; a clear yes/no updates the
+    estimate exactly like the buttons. 503 when Gemini is not configured."""
+    _cell_ok(f, j)
+    _day(t)
+    today = date.today()
+    if voice_used.get(today, 0) >= VOICE_CAP:
+        raise HTTPException(429, "Voice answers are used up for today on this demo. Use the buttons.")
+    voice_used[today] = voice_used.get(today, 0) + 1
+    audio = await request.body()
+    mime = request.headers.get("content-type", "audio/webm")
+    try:   # label_voice blocks for up to 30 s; keep it off the event loop
+        heard = await run_in_threadpool(voice.label_voice, audio, mime,
+                                        replay.run.ix["drugs"][replay.drugs[j]], language)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except voice.VoiceUnavailable as e:
+        raise HTTPException(503, str(e))
+    if heard["answer"] in ("empty", "available"):
+        heard["p"] = _apply(f, j, t, heard["answer"])
+    return heard
 
 
 @app.get("/api/eval")

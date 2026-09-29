@@ -2,11 +2,19 @@
 name = "anumaan"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26"]
+dependencies = ["numpy>=1.26", "ortools>=9.10"]
 
 [project.optional-dependencies]
-grammar = ["google-genai>=1.66"]
+app = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2"]
+gemini = ["google-genai>=1.66"]
 dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["anumaan"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

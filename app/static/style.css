@@ -26,7 +26,7 @@ body {
 button, input { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--carbon); outline-offset: 2px; }
 
-.top, .clock, .headline, .layout, .proof, .foot { padding-inline: clamp(16px, 4vw, 48px); }
+.top, .clock, .headline, .layout, .band, .proof, .foot { padding-inline: clamp(16px, 4vw, 48px); }
 
 .top {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 2rem;
@@ -156,3 +156,20 @@ button, input { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: no-preference) {
   .cell { transition: background-color .25s ease; }
 }
+
+/* moves, national view, facility block */
+.band { padding-block: 1.5rem 1rem; border-top: 1px solid var(--rule); }
+.band h2 { margin: 0 0 .25rem; font-size: 1.375rem; }
+.band h3, .detail h3 { margin: 1.25rem 0 .35rem; font-size: 1.0625rem; }
+ul.plain { list-style: none; margin: 0; padding: 0; max-width: 80ch; }
+ul.plain li { padding: .55rem 0; border-bottom: 1px solid var(--rule); }
+ul.plain li.mine { border-left: 3px solid var(--carbon); padding-left: .75rem; }
+.note { color: var(--muted); font-size: .875rem; margin: .5rem 0 0; max-width: 75ch; }
+table.data { border-collapse: collapse; min-width: 30rem; }
+table.data th, table.data td { padding: .45rem 1.25rem .45rem 0; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.data thead th { color: var(--muted); font-weight: 400; }
+table.data.staff { min-width: 0; width: 100%; font-size: .875rem; }
+.flag { color: var(--out); font-weight: 700; }
+details { margin-top: 1rem; }
+summary { cursor: pointer; font-weight: 700; }
+.confirm button.rec[aria-pressed="true"] { background: var(--out); border-color: var(--out); color: #fff; }

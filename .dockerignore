@@ -1,0 +1,15 @@
+# secrets never enter the image: Cloud Run gets its config from --set-env-vars
+.env
+.env.*
+.git
+.gitignore
+.playwright-mcp
+.remember
+.pytest_cache
+.venv
+**/__pycache__
+**/*.pyc
+node_modules
+tests
+deploy
+README.md
