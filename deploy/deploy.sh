@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploy Anumaan to Cloud Run in Mumbai, with Gemini on Vertex AI for voice.
 #   bash deploy/deploy.sh
-# NOT yet run: project anumaan-c4c has no billing account. Run deploy/budget.sh first.
+# Run deploy/budget.sh first. min-instances 0: scales to zero when idle, so the first
+# request after a quiet spell waits for a cold start.
 # Every call passes --project; this script never changes your gcloud config.
 set -euo pipefail
 
@@ -26,7 +27,7 @@ gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SA" 
 # If the build fails on permissions, grant roles/run.builder to
 # PROJECT_NUMBER-compute@developer.gserviceaccount.com.
 gcloud run deploy anumaan --source . --project "$PROJECT" --region "$REGION" \
-  --service-account "$SA" --min-instances 1 --max-instances 3 --memory 1Gi \
+  --service-account "$SA" --min-instances 0 --max-instances 3 --memory 1Gi \
   --allow-unauthenticated \
   --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=global,ANUMAAN_MODEL=$MODEL"
 

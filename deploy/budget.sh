@@ -3,7 +3,7 @@
 #   bash deploy/budget.sh BILLING_ACCOUNT_ID AMOUNT [CURRENCY]
 #   bash deploy/budget.sh 0X0X0X-0X0X0X-0X0X0X 2000 INR
 # (gcloud billing accounts list shows the id). A budget only sends alerts to billing
-# admins; it does NOT stop spending. min-instances=1 bills around the clock.
+# admins; it does NOT stop spending.
 set -euo pipefail
 
 BILLING=${1:?usage: budget.sh BILLING_ACCOUNT_ID AMOUNT [CURRENCY]}
