@@ -1,18 +1,21 @@
 """Federation: one project per state; only aggregates cross the state line.
 
 Mirrors the cloud design. Each state runs its own GCP project, and its raw
-diagnoses and dispensing slips never leave it. The state decodes them against the
-CRG and runs the filter locally. It exports counts and nothing else: per warehouse
-(district) x medicine, how many PHCs look OK / SCARCE / OUT, how many are in alarm,
-how many began one recently (split into supply-led and demand-led, triage's surge
-test) and on which days alarms began, plus a summary of what its model learned (median
-and IQR of the prescribing rate rho and register trust tau per medicine). A group
-of fewer than k PHCs is suppressed, like the aggregation threshold of a BigQuery
-data clean room. The national project reads only these exports: a cross-state
-shortage view, and shared priors that it hands back to the states.
+diagnoses, dispensing slips and warehouse ledger never leave it. The state decodes
+them against the CRG and runs the filter locally. It exports counts and nothing
+else: per warehouse (district) x medicine, how many PHCs look OK / SCARCE / OUT, how
+many are in alarm, how many began a demand-led one recently (triage's surge test),
+on which days alarms began, and whether the state has stopped filling that
+warehouse's indents (starved, triage's ledger test); plus a summary of what its model
+learned (median and IQR of the prescribing rate rho and register trust tau per
+medicine). A group of fewer than k PHCs is suppressed, like the aggregation threshold
+of a BigQuery data clean room. The national project reads only these exports: a
+cross-state shortage view, and shared priors that it hands back to the states.
 
-Shared modelling pays off at cold start. A state that joined a few days ago cannot
-learn rho and tau from a 30-day warm-up; it can borrow the national priors instead.
+A national failure starves warehouses in every state within a week or two, while
+their buffers still hide it from the PHCs; no single state can tell it from its own
+procurement trouble. Shared priors let a state that joined a few days ago skip the
+30-day warm-up for rho and tau.
 
     python -m anumaan.federation --seeds 5-9 [--behaviour alt]
 
@@ -28,27 +31,17 @@ from anumaan import crg as G, filter as FL, sim, triage
 from anumaan.evaluate import _range, _score
 
 K = 5                      # minimum PHCs behind any exported number
-WINDOW, MIN_HOT = 21, 3    # hot warehouse: 3+ of its PHCs began an alarm within 3 weeks (triage's rule)
+WINDOW, MIN_HOT = 21, 3    # surge-hot warehouse: 3+ of its PHCs began a demand-led alarm within 3 weeks
 TOP = {"state", "day", "k", "rows", "models", "suppressed"}
-COUNTS = ("OK", "SCARCE", "OUT", "alarm", "recent", "surge")
-ROW = {"warehouse", "drug", "n", "onsets", *COUNTS}
+COUNTS = ("OK", "SCARCE", "OUT", "alarm", "surge")
+ROW = {"warehouse", "drug", "n", "onsets", "starved", *COUNTS}
 MODEL = {"drug", "n", "rho", "rho_iqr", "tau", "tau_iqr"}
 FAC_ID = re.compile(r"-P\d+")
 
 
-def learn(N, cats, book, exp_units, receipts, skip, warmup=30):
-    """rho and tau exactly as filter_series learns them (it does not return them).
-    tests/test_federation.py fails if the two drift apart."""
-    ok = ~skip[:warmup]
-    rho = float(np.clip(cats[:warmup][ok].sum() / max(N[:warmup][ok].sum(), 1e-9), 0.3, 1.2))
-    drawn = receipts[1:warmup] - np.diff(book[:warmup])
-    use_w = (rho * exp_units)[1:warmup]
-    tau = float(np.clip(1 - np.abs(drawn - use_w).sum() / max(use_w.sum(), 1e-9), 0.05, 0.8))
-    return rho, tau
-
-
 class StateNode:
-    """One state's project. Holds only its own PHCs' raw events; export() is all that leaves.
+    """One state's project. Holds only its own PHCs' raw events and its own warehouses'
+    ledger; export() is all that leaves.
 
     warmup: days of history rho and tau are learned from; priors: {drug: {rho, tau}}
     from National.priors(), used instead of learning (cold start).
@@ -60,49 +53,57 @@ class StateNode:
         local = {f: i for i, f in enumerate(self.fac)}
         self.wh = [run.wh[f] for f in self.fac]
         self.drugs, self.P = run.ix["drugs"], run.ix["primaries"]
-        # raw events, this state's PHCs only, re-indexed 0..n-1
+        # raw events, this state's PHCs and warehouses only, re-indexed 0..n-1
         self.dx = run.dx[:, self.fac]
         self.slips = [(t, local[f], c, d, dot, u) for t, f, c, d, dot, u in run.slips if f in local]
         self.na = [(t, local[f], c, d) for t, f, c, d in run.na if f in local]
         book, receipts = run.book[:, self.fac], run.receipts[:, self.fac]
+        mine = [w in self.wh for w in sorted(set(run.wh))]
+        self.whs = sorted(set(self.wh))
+        self.fill = triage.fill_rate(run.wh_asked[:, mine], run.wh_got[:, mine], run.wh_posted[:, mine])
 
         obs = G.aggregate(run.ix, self.dx, self.slips, self.na)
         given = sum(obs[c][:, :, self.P].sum(2) for c in G.CATS)
         expected = obs["N"][:, :, self.P].sum(2)
-        self.post, self.segs, self.surge, self.rho, self.tau = {}, {}, {}, {}, {}
+        lift = triage.surge_lift(obs["N"], [state_id] * len(self.fac))
+        T = len(book)
+        self.post, self.cover, self.segs, self.surge, self.rho, self.tau = {}, {}, {}, {}, {}, {}
         for i in range(len(self.fac)):
             skip = FL.entry_gaps(given[:, i], expected[:, i])
             for d in self.P:
                 cats = np.stack([obs[c][:, i, d] for c in G.CATS], 1)
                 series = (obs["N"][:, i, d], cats, book[:, i, d], obs["exp_units"][:, i, d], receipts[:, i, d])
                 prior = (priors or {}).get(self.drugs[d])      # none if every state's summary was suppressed
-                rho, tau = (prior["rho"], prior["tau"]) if prior else learn(*series, skip, warmup)
+                rho, tau = (prior["rho"], prior["tau"]) if prior else FL.learn(*series, skip, warmup)
                 self.rho[(i, d)], self.tau[(i, d)] = rho, tau
-                self.post[(i, d)] = FL.filter_series(*series, skip, tau=tau, rho=rho)
-                self.segs[(i, d)] = FL.alarms(self.post[(i, d)])
-                # onsets triage would call DEMAND-SURGE (demand up, deliveries still coming), as evaluate.py does
-                self.surge[(i, d)] = {s for s, _ in self.segs[(i, d)]
-                                      if triage.demand_led(obs["N"][:, i, d], receipts[:, i, d], s + 1)}
+                self.post[(i, d)] = p = FL.filter_series(*series, skip, tau=tau, rho=rho)
+                self.cover[(i, d)] = c = FL.shadow_cover(book[:, i, d], receipts[:, i, d], obs["units"][:, i, d],
+                                                         FL.trailing_mean(rho * obs["exp_units"][:, i, d]), p, skip)
+                self.segs[(i, d)] = FL.alarms(p, cover=c)
+                # onsets triage would call DEMAND-SURGE if supply held (the state's demand is up)
+                self.surge[(i, d)] = {s for s, _ in self.segs[(i, d)] if lift[min(s + 1, T - 1), i, d] >= triage.SURGE}
 
     def export(self, t):
         """Aggregates as of day t. Alarms count once confirmed (day 2), as in the demo.
         ponytail: rho/tau come from the first `warmup` days, so an export before then
         summarises days after t; gate the models on t >= warmup if that ever matters."""
         rows, models, suppressed = [], [], 0
-        for w in sorted(set(self.wh)):
+        starved = triage.starved(self.fill, t - triage.LOOK, t)
+        for k, w in enumerate(self.whs):
             members = [i for i, x in enumerate(self.wh) if x == w]
             for d in self.P:
                 if len(members) < self.k:
                     suppressed += 1
                     continue
                 segs = [[(s, e) for s, e in self.segs[(i, d)] if s + 1 <= t] for i in members]
-                new = [{s in self.surge[(i, d)] for s, _ in sg if s >= t - WINDOW} for i, sg in zip(members, segs)]
                 reg = [FL.REGIMES[int(self.post[(i, d)][t].argmax())] for i in members]
                 rows.append(dict(warehouse=w, drug=self.drugs[d], n=len(members),
                                  **{r: reg.count(r) for r in FL.REGIMES},
                                  alarm=sum(any(t < e for _, e in sg) for sg in segs),
-                                 recent=sum(False in x for x in new),     # began an alarm in the window, supply-led
-                                 surge=sum(True in x for x in new),       # ... demand-led
+                                 # PHCs that began a demand-led alarm in the window
+                                 surge=sum(any(s >= t - WINDOW and s in self.surge[(i, d)] for s, _ in sg)
+                                           for i, sg in zip(members, segs)),
+                                 starved=int(starved[k, d]),
                                  onsets=sorted(int(s) for sg in segs for s, _ in sg)))
         n = len(self.fac)
         for d in self.P:
@@ -138,7 +139,8 @@ def assert_no_raw(export, k=K):
         need(count(n) and n >= k, f"group size n={n!r} is not a count of at least k={k} PHCs")
         need(type(r["warehouse"]) is str and re.fullmatch(rf"{state}-W\d+", r["warehouse"]) and name(r["drug"]),
              "row ids off-schema")
-        need(all(count(r[c], n) for c in COUNTS) and r["OK"] + r["SCARCE"] + r["OUT"] == n, "row counts off-schema")
+        need(all(count(r[c], n) for c in COUNTS) and r["OK"] + r["SCARCE"] + r["OUT"] == n
+             and count(r["starved"], 1), "row counts off-schema")
         on = r["onsets"]    # alarms last 2+ days with a gap between: at most one onset per PHC per 3 days
         need(type(on) is list and all(count(s, day) for s in on) and len(on) <= n * (day // 3 + 1),
              "onsets must be day numbers up to the export day")
@@ -161,19 +163,20 @@ class National:
         self.exports[export["state"]] = export
 
     def view(self):
-        """Per medicine: hot warehouses per state (MIN_HOT+ PHCs began a supply-led alarm in
-        the window). 2+ hot in a state is a state shortage; 2+ such states is a national
-        shortage (triage's rule, on aggregates alone). The same spread of demand-led alarms
-        is a national surge: the fix is bigger indents, not escalation to MoHFW."""
+        """Per medicine, per state: starved warehouses (the state stopped filling their
+        indents). 2+ starved in a state is a state shortage; 2+ such states is a national
+        shortage (triage's rule, on aggregates alone). Demand-led alarms spread the same way
+        (MIN_HOT+ PHCs per warehouse) are a national surge: the fix is bigger indents, not
+        escalation to MoHFW."""
         spread = {}
         for s, ex in self.exports.items():
             for r in ex["rows"]:
-                for key in ("recent", "surge"):
+                for key, hot in (("starved", r["starved"]), ("surge", r["surge"] >= MIN_HOT)):
                     h = spread.setdefault((r["drug"], key), {})
-                    h[s] = h.get(s, 0) + (r[key] >= MIN_HOT)
+                    h[s] = h.get(s, 0) + hot
         wide = lambda h: sum(n >= 2 for n in h.values()) >= 2
-        return {d: dict(hot=h, short_states=sorted(s for s, n in h.items() if n >= 2), national=wide(h),
-                        surge=wide(spread[(d, "surge")])) for (d, key), h in spread.items() if key == "recent"}
+        return {d: dict(starved=h, short_states=sorted(s for s, n in h.items() if n >= 2), national=wide(h),
+                        surge=wide(spread[(d, "surge")])) for (d, key), h in spread.items() if key == "starved"}
 
     def priors(self):
         """What states receive back: per medicine, the median of the states' median rho and tau.
@@ -209,8 +212,8 @@ def cold_start(run, cold, ks=(3, 7), k=K):
         # a medicine whose prior was suppressed falls back to what the cold state can learn itself
         nodes = dict(local=StateNode(run, cold, k, warmup=days), priors=StateNode(run, cold, k, days, pri), warm30=ref)
         out[days] = {}
-        for name, node in nodes.items():   # live from day `days`: alarms on the posterior from then on
-            amap = {(node.fac[i], d): [(s + days, e + days) for s, e in FL.alarms(p[days:])]
+        for name, node in nodes.items():   # live from day `days`: alarms from then on
+            amap = {(node.fac[i], d): [(s + days, e + days) for s, e in FL.alarms(p[days:], cover=node.cover[(i, d)][days:])]
                     for (i, d), p in node.post.items()}
             out[days][name] = dict(_score(amap, events, scarce, T - days), events=len(events))
     return out
@@ -227,7 +230,7 @@ def main():
              else [int(s) for s in a.seeds.split(",")])
     ks = (3, 7)
     print(f"SYNTHETIC federation - seeds {a.seeds}, behaviour '{a.behaviour}', k={a.k}")
-    res, caught, stray = {}, 0, []
+    res, caught, stray, lead, after = {}, 0, [], [], [0, 0]
     for n_seed, seed in enumerate(seeds):
         run = sim.simulate(seed=seed, behaviour=a.behaviour)
         states, T = sorted(set(run.st)), run.book.shape[0]
@@ -249,7 +252,7 @@ def main():
                   f"{len(node.fac) // len(set(node.wh))} PHCs per warehouse: {strict['suppressed']} suppressed, "
                   f"{len(strict['rows'])} warehouse rows and {len(strict['models'])} state-level model summaries "
                   f"({len(node.fac)} PHCs) left")
-            print("\nnational view, re-run on every day's exports (2+ states with 2+ hot warehouses);\n"
+            print("\nnational view, re-run on every day's exports (2+ states with 2+ starved warehouses);\n"
                   "  scored against the injected NATIONAL failures (GROUND TRUTH), counting its start to end + 21 days:")
         flags = {}      # (drug, "national" | "surge") -> flag per day
         for t in range(T):
@@ -260,14 +263,27 @@ def main():
                 for f in ("national", "surge"):
                     flags.setdefault((d, f), np.zeros(T, bool))[t] = v[f]
         # evaluation only: GROUND TRUTH
-        inj = [(run.ix["drugs"][e["drug"]], e["start"], e["end"]) for e in run.episodes
+        events = sim.stockout_events(run)
+        inj = [(run.ix["drugs"][e["drug"]], e["start"], e["end"], k) for k, e in enumerate(run.episodes)
                if e["type"] == "NATIONAL" and e["drug"] in run.ix["primaries"]]
-        on = sum(int(flags.get((d, "national"), np.zeros(T))[s:e + 21].sum()) for d, s, e in inj)
-        off = sum(int(m.sum()) for (d, f), m in flags.items() if f == "national") - on
+        on = sum(int(flags.get((d, "national"), np.zeros(T))[s:e + 21].sum()) for d, s, e, _ in inj)
+        tail = sum(int(flags.get((d, "national"), np.zeros(T))[e + 21:].sum()) for d, s, e, _ in inj)
+        off = sum(int(m.sum()) for (d, f), m in flags.items() if f == "national") - on - tail
         caught, stray = caught + (on > 0), stray + [off]
         surged = {d: int(m.sum()) for (d, f), m in flags.items() if f == "surge" and m.any()}
-        print(f"  seed {seed}: injected {', '.join(f'{d} days {s}-{e - 1}' for d, s, e in inj) or 'none'}: "
-              f"shortage flag on it {on} days, on other medicines {off} days; surge flag days {surged or 'none'}")
+        when = []
+        for d, s, e, k in inj:
+            hit = np.nonzero(flags.get((d, "national"), np.zeros(T))[s:e + 21])[0]
+            outs = [x["out"] for x in events if x["ep"] == k]
+            if len(hit):
+                first = s + int(hit[0])
+                lead.append(first - s)
+                after[0], after[1] = after[0] + sum(o >= first for o in outs), after[1] + len(outs)
+                when.append(f"first raised day {first}, {first - s} days in; "
+                            f"{sum(o >= first for o in outs)} of the {len(outs)} PHC stock-outs it caused began after")
+        print(f"  seed {seed}: injected {', '.join(f'{d} days {s}-{e - 1}' for d, s, e, _ in inj) or 'none'}: "
+              f"shortage flag on it {on} days{' (' + '; '.join(when) + ')' if when else ''}, {tail} more after, "
+              f"on other medicines {off} days; surge flag days {surged or 'none'}")
         if n_seed == 0:
             print("  national priors (median of state medians, from the last day's exports): " + ", ".join(
                 f"{d} rho {p['rho']:.2f} tau {p['tau']:.2f}" for d, p in nat.priors().items()) or "none, all suppressed")
@@ -276,19 +292,26 @@ def main():
                 for name, m in by.items():
                     res.setdefault((days, name), []).append(m)
 
-    print(f"  national shortage flag raised on the injected failure in {caught}/{len(seeds)} seeds; "
-          f"{np.mean(stray):.1f} flag-days per seed on other medicines")
+    print(f"  national shortage flag raised on the injected failure in {caught}/{len(seeds)} seeds"
+          + (f", {_range(lead, '{:.0f}')} days after it began, ahead of {after[0]} of the {after[1]} PHC "
+             f"stock-outs those failures caused" if lead else "")
+          + f"; {np.mean(stray):.1f} flag-days per seed on other medicines")
     print(f"\ncold start: each state in turn joins with only d days of history; priors come from the "
           f"other state's export. Scored on stock-outs after day d, {len(seeds)} seeds x 2 states:")
     print(f"  mean (min-max) over the {2 * len(seeds)} cold states")
-    print(f"{'':34}{'events':>8}{'detected':>18}{'4+ day outs':>18}{'false alarms/series-yr':>26}")
+    print(f"{'':34}{'events':>8}{'detected':>18}{'warned early':>18}{'false alarms/series-yr':>26}")
     label = dict(local="learned from {} days", priors="national priors", warm30="reference: 30-day warm-up")
     for days in ks:
         for name in ("local", "priors", "warm30"):
             ms = res[(days, name)]
             col = lambda key: f"{np.nanmean([m[key] for m in ms]):.2f} ({_range([m[key] for m in ms])})"
             print(f"  d={days} {label[name].format(days):28}{_range([m['events'] for m in ms], '{:.0f}'):>8}"
-                  f"{col('recall'):>18}{col('recall_4d'):>18}{col('false_per_series_year'):>26}")
+                  f"{col('recall'):>18}{col('early'):>18}{col('false_per_series_year'):>26}")
+        pair = lambda key, better: sum(better(p[key], q[key]) for p, q in zip(res[(days, "priors")], res[(days, "local")]))
+        print(f"  d={days} priors vs learned, per cold state: fewer false alarms in "
+              f"{pair('false_per_series_year', lambda p, q: p < q)}, more in {pair('false_per_series_year', lambda p, q: p > q)}; "
+              f"more warned early in {pair('early', lambda p, q: p > q)}, fewer in {pair('early', lambda p, q: p < q)} "
+              f"(of {len(res[(days, 'priors')])})")
 
 
 if __name__ == "__main__":

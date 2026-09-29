@@ -40,15 +40,19 @@ class Replay:
         T, F, J = run.book.shape[0], len(run.facilities), len(P)
         given = sum(obs[k][:, :, P].sum(2) for k in G.CATS)
         self.skip = [FL.entry_gaps(given[:, f], obs["N"][:, f, P].sum(1)) for f in range(F)]
-        self.post = np.zeros((T, F, J, 3))
+        self.post, self.cover = np.zeros((T, F, J, 3)), np.zeros((T, F, J))
         self.use = np.stack([FL.trailing_mean(obs["exp_units"][:, f, d]) for f in range(F) for d in P], 1).reshape(T, F, J)
         self.onset = np.full((T, F, J), -1)
         self.segs, self.confirm = {}, {}
         for f in range(F):
             for j in range(J):
                 self.refilter(f, j)
-        # views onto self.post keyed by drug index, as the planner expects; refilter writes in place
+        # views onto self.post / self.cover keyed by drug index, as the planner expects; refilter writes in place
         self.post_d = {(f, d): self.post[:, f, j] for f in range(F) for j, d in enumerate(P)}
+        self.cover_d = {(f, d): self.cover[:, f, j] for f in range(F) for j, d in enumerate(P)}
+        self.whs = sorted(set(run.wh))
+        self.fill = triage.fill_rate(run.wh_asked, run.wh_got, run.wh_posted)
+        self.lift = triage.surge_lift(obs["N"], run.st)
         self.coords = PL.synthetic_coords(run, seed)
         self.out_mask = (obs["na"] > 0) | (obs["sub"] > 0) | (obs["units"] == 0)
         self.care = CARE.simulate(run, seed)
@@ -60,10 +64,14 @@ class Replay:
     def refilter(self, f, j):
         run, obs, d = self.run, self.obs, self.drugs[j]
         cats = np.stack([obs[k][:, f, d] for k in G.CATS], 1)
-        p = FL.filter_series(obs["N"][:, f, d], cats, run.book[:, f, d], obs["exp_units"][:, f, d],
-                             run.receipts[:, f, d], self.skip[f], confirm=self.confirm.get((f, j)))
+        N, rec, book, exp = obs["N"][:, f, d], run.receipts[:, f, d], run.book[:, f, d], obs["exp_units"][:, f, d]
+        rho, tau = FL.learn(N, cats, book, exp, rec, self.skip[f])
+        checks = self.confirm.get((f, j))
+        p = FL.filter_series(N, cats, book, exp, rec, self.skip[f], tau=tau, confirm=checks, rho=rho)
         self.post[:, f, j] = p
-        self.segs[(f, j)] = segs = FL.alarms(p, THR)
+        self.cover[:, f, j] = FL.shadow_cover(book, rec, obs["units"][:, f, d], FL.trailing_mean(rho * exp), p,
+                                              self.skip[f], checks)
+        self.segs[(f, j)] = segs = FL.alarms(p, THR, self.cover[:, f, j])
         self.onset[:, f, j] = -1
         for s, e in segs:
             self.onset[s + 1:e, f, j] = s     # an alarm needs 2 days: live from s+1
@@ -73,23 +81,25 @@ class Replay:
             self.run.book[t, f, self.drugs[j]] >= 7 * max(self.use[t, f, j], 1e-9)
 
     def labels(self, t):
-        run, obs = self.run, self.obs
         known = [(f, j, s) for (f, j), segs in self.segs.items() for s, _ in segs if s + 1 <= t]
-        surge = {(f, j, s) for f, j, s in known
-                 if triage.demand_led(obs["N"][:, f, self.drugs[j]], run.receipts[:, f, self.drugs[j]], s + 1)}
-        return dict(zip(known, triage.classify(known, run.wh, run.st, settle=t, surge=surge)))
+        onsets = [(f, self.drugs[j], s) for f, j, s in known]      # triage indexes drugs, not columns
+        return dict(zip(known, triage.classify(onsets, self.run.wh, self.run.st, self.fill, self.lift, t)))
 
     def cell(self, t, f, j, labels, truth):
         run, d = self.run, self.drugs[j]
         p = self.post[t, f, j]
         book = run.book[t, f, d]
         c = dict(f=f, j=j, book=round(book), cover=round(book / max(self.use[t, f, j], 1e-9), 1),
+                 shadow=round(float(self.cover[t, f, j]), 1),
                  p=[round(float(x), 3) for x in p], regime=FL.REGIMES[int(p.argmax())],
                  alarm=bool(self.onset[t, f, j] >= 0), phantom=bool(self.phantom(t, f, j)),
                  confirmed=(self.confirm.get((f, j)) or {}).get(t))
         if c["alarm"]:
             s = int(self.onset[t, f, j])
-            c.update(onset=s, level=labels[(f, j, s)], action=triage.ACTION[labels[(f, j, s)]])
+            fill = self.fill[t, self.whs.index(run.wh[f]), d]
+            c.update(onset=s, level=labels[(f, j, s)], action=triage.ACTION[labels[(f, j, s)]],
+                     by_stock=bool(p[1] + p[2] < THR),   # live only because the shadow stock is low
+                     fill=None if np.isnan(fill) else round(float(fill), 2), lift=round(float(self.lift[t, f, d]), 2))
         if truth:
             c["true"] = round(run.true_stock[t, f, d])
             c["true_cover"] = round(run.true_stock[t, f, d] / max(run.true_use[t, f, d], 1e-9), 1)
@@ -125,7 +135,7 @@ def meta():
     t0 = int(ph.sum((1, 2)).argmax())
     f0, j0 = map(int, np.argwhere(ph[t0])[0]) if ph[t0].any() else (0, 0)
     return dict(days=DAYS, synthetic=True, grammar=crg["version"], grammar_note=crg["source_note"],
-                start=dict(day=t0, f=f0, j=j0), horizon=HORIZON,
+                start=dict(day=t0, f=f0, j=j0), horizon=HORIZON, low=FL.LOW,
                 facilities=[dict(id=i, wh=w, st=s) for i, w, s in zip(run.facilities, run.wh, run.st)],
                 drugs=[dict(name=run.ix["drugs"][d], unit=crg["drugs"][run.ix["drugs"][d]]["unit"]) for d in replay.drugs],
                 cadres=CARE.CADRES, levels=triage.LEVELS, actions=triage.ACTION)
@@ -197,8 +207,8 @@ def plan(t: int):
     """Redistribution for day t: same-state transfers in treatment courses (OR-Tools
     min-cost flow), escalations where moving stock cannot help, DVDMS-style orders."""
     run, obs = replay.run, replay.obs
-    labels = PL.labels_at(_day(t), run, replay.post_d, obs)
-    return PL.plan(t, run, replay.post_d, labels, replay.coords, horizon=HORIZON, obs=obs)
+    labels = PL.labels_at(_day(t), run, replay.post_d, obs, replay.cover_d)
+    return PL.plan(t, run, replay.post_d, labels, replay.coords, horizon=HORIZON, obs=obs, cover=replay.cover_d)
 
 
 @app.get("/api/national")

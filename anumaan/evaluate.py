@@ -3,12 +3,13 @@
     python -m anumaan.evaluate --seeds 5-9 --behaviour alt [--ration 0]
 
 Every comparison sees only what a real deployment would see:
+  care_only     the filter alone, without the shadow-stock alarm
   register <Nd  trust the register: alarm when it shows under N days of expected use
   register best the register threshold with the most catches at the model's false-alarm rate
   receipt_gap   no real delivery for 33 days
   crg_rule      the same CRG decoding (7-day full-course share) with a tuned threshold, no filter
-  drug_only     the filter without diagnoses: each drug against its own warm-up dispensing
-Filter, triage and crg_rule thresholds were tuned on seeds 0-4; report seeds 5-9.
+  drug_only     the filter and shadow stock without diagnoses: each drug against its own warm-up dispensing
+Filter, shadow, triage and crg_rule thresholds were tuned on seeds 0-4; report seeds 5-9.
 """
 import argparse
 from collections import Counter
@@ -58,18 +59,23 @@ def evaluate(run):
     days, F = run.book.shape[:2]
     given = sum(obs[k][:, :, P].sum(2) for k in G.CATS)
     expected = obs["N"][:, :, P].sum(2)
-    methods = {k: {} for k in ("model", "drug_only", "crg_rule", "receipt_gap")}
-    cover, scarce, post = {}, {}, {}
+    methods = {k: {} for k in ("model", "care_only", "drug_only", "crg_rule", "receipt_gap")}
+    cover, scarce = {}, {}
     for f in range(F):
         skip = FL.entry_gaps(given[:, f], expected[:, f])
         for d in P:
             cats = np.stack([obs[k][:, f, d] for k in G.CATS], 1)
-            N, rec, book = obs["N"][:, f, d], run.receipts[:, f, d], run.book[:, f, d]
-            post[(f, d)] = FL.filter_series(N, cats, book, obs["exp_units"][:, f, d], rec, skip)
-            methods["model"][(f, d)] = FL.alarms(post[(f, d)])
+            N, rec, book, exp, units = (obs["N"][:, f, d], run.receipts[:, f, d], run.book[:, f, d],
+                                        obs["exp_units"][:, f, d], obs["units"][:, f, d])
+            rho, tau = FL.learn(N, cats, book, exp, rec, skip)
+            post = FL.filter_series(N, cats, book, exp, rec, skip, tau=tau, rho=rho)
+            shadow = FL.shadow_cover(book, rec, units, FL.trailing_mean(rho * exp), post, skip)
+            methods["model"][(f, d)] = FL.alarms(post, cover=shadow)
+            methods["care_only"][(f, d)] = FL.alarms(post)
             flat_n = np.full(days, cats[:30][~skip[:30]].sum(1).mean())
             flat_u = np.full(days, obs["units"][:30, f, d][~skip[:30]].mean())
-            methods["drug_only"][(f, d)] = FL.alarms(FL.filter_series(flat_n, cats, book, flat_u, rec, skip))
+            post0 = FL.filter_series(flat_n, cats, book, flat_u, rec, skip)
+            methods["drug_only"][(f, d)] = FL.alarms(post0, cover=FL.shadow_cover(book, rec, units, flat_u, post0, skip))
             full = FL.trailing_mean(cats[:, 0] * ~skip, 7) / np.maximum(FL.trailing_mean(N * ~skip, 7), 1e-9)
             methods["crg_rule"][(f, d)] = FL.segments(full < 0.6 * full[:30].mean(), min_len=5)
             got = rec > 3 * rec[:30].sum() / 30
@@ -90,7 +96,8 @@ def evaluate(run):
     # where did it break: score on caught events, per event and per episode
     model = methods["model"]
     onsets = [(f, d, s) for (f, d), segs in model.items() for s, _ in segs]
-    surge = {(f, d, s) for f, d, s in onsets if triage.demand_led(obs["N"][:, f, d], run.receipts[:, f, d], s + 1)}
+    fill = triage.fill_rate(run.wh_asked, run.wh_got, run.wh_posted)
+    lift = triage.surge_lift(obs["N"], run.st)
     caught = [(e, (e["fac"], e["drug"], min(h))) for e in events if (h := _hits(model, e))]
     first = {}
     for e, o in caught:
@@ -100,7 +107,8 @@ def evaluate(run):
     counts = Counter(e["type"] for e, _ in caught)
     res["triage_majority"] = max(counts.values()) / len(caught) if caught else float("nan")
     for settle in (7, 21):
-        labels = dict(zip(onsets, triage.classify(onsets, run.wh, run.st, settle=settle, surge=surge)))
+        labels = dict(zip(onsets, triage.classify(onsets, run.wh, run.st, fill, lift,
+                                                  [s + 1 + settle for _, _, s in onsets])))
         pairs = [(e["type"], labels[o]) for e, o in caught]
         res[f"triage_{settle}d"] = dict(
             accuracy=float(np.mean([a == b for a, b in pairs])) if pairs else float("nan"),
@@ -134,7 +142,8 @@ def main():
     print(f"  {_range([r['events'] for r in rs], '{:.0f}')} true stock-outs per run; shelf availability "
           f"{_range([r['availability'] for r in rs])}; mix {dict(sum((r['types'] for r in rs), Counter()))}")
     print(f"\n{'':16}{'detected':>10}{'4+ day outs':>13}{'warned early':>14}{'median lead (d)':>17}{'false alarms/series-yr':>24}")
-    rows = [("anumaan", [r["model"] for r in rs]), ("drug_only", [r["drug_only"] for r in rs]),
+    rows = [("anumaan", [r["model"] for r in rs]), ("care_only", [r["care_only"] for r in rs]),
+            ("drug_only", [r["drug_only"] for r in rs]),
             ("crg_rule", [r["crg_rule"] for r in rs]), ("receipt_gap", [r["receipt_gap"] for r in rs])]
     rows += [(f"register <{k}d", [r["register"][k] for r in rs]) for k in (3, 7, 14, 21)]
     rows += [("register best", [r["register_best"] for r in rs if r["register_best"]])]

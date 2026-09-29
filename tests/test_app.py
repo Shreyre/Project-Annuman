@@ -10,6 +10,7 @@ def test_every_view_answers_for_the_demo_day():
     t, f, j = meta["start"]["day"], meta["start"]["f"], meta["start"]["j"]
     day = client.get(f"/api/day/{t}").json()
     assert day["summary"]["phantom"] > 0                          # the demo opens on hidden stock-outs
+    assert all({"level", "by_stock", "lift", "fill"} <= set(c) for c in day["cells"] if c["alarm"])   # the UI explains each label
     assert client.get(f"/api/series/{f}/{j}?t={t}").status_code == 200
     fc = client.get(f"/api/forecast/{f}/{j}?t={t}").json()
     assert len(fc["mean"]) == meta["horizon"] and fc["lo"][0] is not None

@@ -7,6 +7,9 @@ be tested end to end. Nothing here is real data.
 The world is deliberately messy: routine indents are part-filled, upstream
 failures still let a trickle through, warehouses hold 30-90 days, a monsoon
 surge lifts fever and diarrhoea, and some days' slips are never entered.
+
+Each district warehouse also keeps a DVDMS-style ledger: its weekly indent to
+the state and what arrived against it, posted 0-10 days late and 5% never.
 """
 from dataclasses import dataclass
 
@@ -44,6 +47,9 @@ class Run:
     na: list             # (day, fac, cond, drug) not-available records
     book: np.ndarray     # [day, fac, drug] stock register, end of day
     receipts: np.ndarray  # [day, fac, drug] units received from the warehouse
+    wh_asked: np.ndarray  # [day, warehouse, drug] units each warehouse indented from the state (weekly)
+    wh_got: np.ndarray    # [day, warehouse, drug] units the state sent against that indent
+    wh_posted: np.ndarray  # [day, warehouse, drug] day the ledger posted that receipt (days = never)
     true_stock: np.ndarray  # GROUND TRUTH [day, fac, drug] - never given to the model
     rate: np.ndarray     # GROUND TRUTH [fac, drug] baseline units/day (what indents are sized on)
     true_use: np.ndarray  # GROUND TRUTH [day, fac, drug] expected units/day incl. the surge
@@ -126,16 +132,19 @@ def simulate(seed=0, days=200, n_states=2, n_wh=3, n_phc=6, behaviour="default",
 
     dx = np.zeros((days, F, C), int)
     BOOK, TRUE, REC, USE = (np.zeros((days, F, D)) for _ in range(4))
+    ASKED, GOT = np.zeros((days, len(whs), D)), np.zeros((days, len(whs), D))
     slips, na = [], []
 
     for t in range(days):
         for e in eps:                                   # a failing warehouse's shelf drops at once
             if e["type"] == "WAREHOUSE" and t == e["start"]:
                 W[whs.index(e["root"]), e["drug"]] *= e["short"]
-        if t % 7 == 0:
+        if t % 7 == 0:                                  # weekly indent to the state, up to target
             for w in range(len(whs)):
                 for d in range(D):
-                    W[w, d] = max(W[w, d], wtarget[w, d] * upstream_share(w, d, t))
+                    new = max(W[w, d], wtarget[w, d] * upstream_share(w, d, t))
+                    ASKED[t, w, d], GOT[t, w, d] = wtarget[w, d] - W[w, d], new - W[w, d]
+                    W[w, d] = new
         rec = np.zeros((F, D))
         for f in range(F):
             cycle = (t - off[f]) % 30 == 0
@@ -207,7 +216,10 @@ def simulate(seed=0, days=200, n_states=2, n_wh=3, n_phc=6, behaviour="default",
         book = np.maximum(book, 0)
         BOOK[t], TRUE[t], REC[t] = book, S, rec
 
-    return Run(ix, fac, wh, st, dx, slips, na, BOOK, REC, TRUE, rate, USE, ration_cover, eps)
+    # drawn after the loop, so the world above is the same with or without the ledger
+    posted = np.arange(days)[:, None, None] + rng.integers(0, 11, GOT.shape)
+    posted[rng.random(GOT.shape) < 0.05] = days
+    return Run(ix, fac, wh, st, dx, slips, na, BOOK, REC, ASKED, GOT, posted, TRUE, rate, USE, ration_cover, eps)
 
 
 def stockout_events(run, min_len=2, merge_gap=2):

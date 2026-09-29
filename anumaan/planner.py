@@ -9,11 +9,11 @@ weeks"; the register cannot.
   recipients   in alarm (P(SCARCE) + P(OUT) >= 0.7) and labelled LOCAL, WAREHOUSE
                or DEMAND-SURGE. Need = trailing diagnoses x horizon, less any
                guideline substitute the register shows on the shelf.
-  donors       calm for a week (P(OK) >= 0.9 every day, so not rationing) with
-               register cover above the reserve. Surplus is discounted because
-               registers overstate, and nobody donates a drug that carries a
-               WAREHOUSE, STATE-PROCUREMENT or NATIONAL alarm on their warehouse,
-               state or country: their "surplus" is likely next month's gap (see DISCOUNT).
+  donors       calm for a week (P(OK) >= 0.9 every day, so not rationing), in no
+               alarm, with shadow stock above the reserve (see SHADOW_TRUST). Nobody
+               donates a drug that carries a WAREHOUSE, STATE-PROCUREMENT or NATIONAL
+               alarm on their warehouse, state or country: no resupply is coming, so
+               their "surplus" is next month's gap.
   escalations  STATE-PROCUREMENT and NATIONAL alarms. Moving stock around inside a
                shortage that big cannot fix it.
 
@@ -38,22 +38,21 @@ from anumaan.evaluate import _range as rng
 THR = 0.7
 GIVE_TO = ("LOCAL", "WAREHOUSE", "DEMAND-SURGE")
 ESCALATE = ("STATE-PROCUREMENT", "NATIONAL")
-# Share of the register balance we trust. Registers overstate (issues posted late or
-# never, opening balances inflated) - on seeds 0-4 calm PHCs held a median 0.5 of what
-# their register said - so the discount applies BEFORE the reserve is taken off: taking
-# it off the surplus alone still sent half the donors under their reserve.
-# Picked on seeds 0-4 with evaluate_plan (same-state arcs, donor veto on), on a 0.05 grid:
-# the largest discount keeping 85% of courses from donors with true surplus (0.50: 0.72,
-# 0.40: 0.846, 0.35: 0.88, 0.30: 0.91, at a steep cost in volume).
-# The donor veto was chosen on the same seeds by the same rule. It fires on labels that
-# are mostly NOT true state/national failures (CLI: escalations), and at a fixed discount
-# it costs need met (seeds 0-4 pooled: surplus 0.88 vs 0.84 without, need met 0.20 vs
-# 0.26, to-truly-short 0.76 vs 0.78). But buying that surplus back with a tighter
-# discount costs more: at 0.30 without veto, surplus 0.88 and need met only 0.14;
-# WAREHOUSE-only veto at 0.30: 0.885, 0.12. So the veto is the cheaper lever.
-# ponytail: one network-wide number; upgrade to a per-facility trust learned like the
-# filter's tau once shelf checks come back.
+# Donor surplus comes from the shadow stock (filter.shadow_cover), which unposted issues
+# cannot inflate; its opening balance still can, so only SHADOW_TRUST of it counts, taken
+# BEFORE the reserve comes off. Picked on seeds 0-4 with evaluate_plan on a 0.05 grid: the
+# largest share keeping 85% of courses from donors with true surplus (0.50: 0.94, 0.55: 0.89,
+# 0.60: 0.81). Trusting 35% of the register instead: 0.84 of courses and a quarter of the need.
+# ponytail: one network-wide number; upgrade to a per-facility trust once shelf checks come back.
+SHADOW_TRUST = 0.55
+# Without a shadow stock (the register-fed baseline, and a substitute on a recipient's own
+# shelf) only DISCOUNT of the register counts. Registers overstate - on seeds 0-4 calm PHCs
+# held a median 0.5 of what their register said. Chosen by the same rule when the planner ran
+# on the register.
 DISCOUNT = 0.35
+# The donor veto no longer moves the one-day scores now that labels come from the ledger
+# (seeds 0-4: surplus 0.891 vs 0.890 without it, need met 0.48 vs 0.50). It stays because a
+# donor under an upstream failure has no resupply coming, which a one-day snapshot cannot score.
 ROAD, KMH = 1.4, 35          # road km per straight-line km, average rural van speed
 ROUTES_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
 
@@ -99,34 +98,45 @@ def route_matrix_requests(coords, tile=25):
             for o in range(0, len(wp), tile) for d in range(0, len(wp), tile)]
 
 
-def labels_at(t, run, post, obs):
+def labels_at(t, run, post, obs, cover=None):
     """Triage label of the alarm live at day t for each (f, d), else None. Causal: only
-    onsets confirmed by day t are clustered, as the demo app does it."""
-    segs = {k: FL.alarms(p[:t + 1], THR) for k, p in post.items()}
+    alarms confirmed by day t are labelled, from the ledger up to day t, as the demo app
+    does it. cover: {(f, d): shadow cover [T]}, to count shadow-stock alarms too."""
+    cover = cover or {}
+    segs = {k: FL.alarms(p[:t + 1], THR, c[:t + 1] if (c := cover.get(k)) is not None else None)
+            for k, p in post.items()}
     known = [(f, d, s) for (f, d), ss in segs.items() for s, _ in ss]
-    surge = {(f, d, s) for f, d, s in known if triage.demand_led(obs["N"][:, f, d], run.receipts[:, f, d], s + 1)}
-    lab = dict(zip(known, triage.classify(known, run.wh, run.st, settle=t + 1, surge=surge)))
+    fill = triage.fill_rate(run.wh_asked, run.wh_got, run.wh_posted)
+    lab = dict(zip(known, triage.classify(known, run.wh, run.st, fill, triage.surge_lift(obs["N"], run.st), t)))
     return {(f, d): lab[(f, d, ss[-1][0])] if ss and ss[-1][1] == t + 1 else None for (f, d), ss in segs.items()}
 
 
-def plan(t, run, post, labels, coords, horizon=14, reserve_days=14, max_minutes=180, obs=None):
+def plan(t, run, post, labels, coords, horizon=14, reserve_days=14, max_minutes=180, obs=None, cover=None):
     """Redistribution plan for day t.
 
     post: {(f, d): regime posterior [T, 3]} per facility x drug index; labels: {(f, d):
     triage label or None} at day t (labels_at); coords: [F, 2] lat/lon; obs: the
-    G.aggregate output if already computed. Reads only what a deployment sees.
+    G.aggregate output if already computed; cover: {(f, d): shadow cover [T]} (without
+    it, donors are sized on the discounted register). Reads only what a deployment sees.
     Returns dict(transfers, escalations, orders, recipients).
     """
     ix, fac, names = run.ix, run.facilities, run.ix["drugs"]
     obs = obs or G.aggregate(ix, run.dx, run.slips, run.na)
+    cover = cover or {}
     st = np.array(run.st)
     mins = np.where(st[:, None] == st, travel_minutes(coords), np.inf)   # no routine issue across a state line
     lo = max(t - 13, 0)
     use = obs["exp_units"][lo:t + 1].mean(0)          # [F, D] expected units/day, trailing 14 days
     courses_per_day = obs["N"][lo:t + 1].mean(0)
 
-    def spare(f, d, cu):   # discounted register above the reserve, in whole courses
-        return int(max(DISCOUNT * run.book[t, f, d] - reserve_days * use[f, d], 0) // cu)
+    def held(f, d):        # units on the shelf as the plan sees them, and the share trusted
+        if (f, d) in cover:
+            return cover[(f, d)][t] * use[f, d], SHADOW_TRUST
+        return run.book[t, f, d], DISCOUNT
+
+    def spare(f, d, cu):   # trusted share above the reserve, in whole courses
+        units, trust = held(f, d)
+        return int(max(trust * units - reserve_days * use[f, d], 0) // cu)
 
     subs = {}
     for (_, d), (_, _, ss) in ix["course"].items():
@@ -155,7 +165,7 @@ def plan(t, run, post, labels, coords, horizon=14, reserve_days=14, max_minutes=
                     if got > 0:
                         sub_left[(f, s)] -= got
                         row.update(substitute=names[s], sub_courses=row["sub_courses"] + got)
-            elif (p[max(t - 6, 0):t + 1, 0] >= 0.9).all() and not {run.wh[f], run.st[f], "IN"} & hot:
+            elif lv is None and (p[max(t - 6, 0):t + 1, 0] >= 0.9).all() and not {run.wh[f], run.st[f], "IN"} & hot:
                 if (s := spare(f, d, cu)) > 0:
                     donors[f] = s
         out["recipients"] += rows.values()
@@ -164,12 +174,13 @@ def plan(t, run, post, labels, coords, horizon=14, reserve_days=14, max_minutes=
             r, units = rows[b], int(round(k * cu))
             r["planned"] += k
             sub = f" after {r['sub_courses']} courses of {r['substitute']} on its shelf" if r["substitute"] else ""
+            units_held, trust = held(a, d)
             out["transfers"].append(dict(
                 from_fac=fac[a], to_fac=fac[b], drug=names[d], courses=k, units=units, minutes=round(float(mins[a, b])),
                 reason=f"{fac[b]}: {r['level']} alarm, P(short) {r['p_short']:.2f}, needs {need[b]} courses over "
-                       f"{horizon}d{sub}. {fac[a]}: calm 7 days, register shows "
-                       f"{run.book[t, a, d] / max(use[a, d], 1e-9):.0f}d of use; trusting {DISCOUNT:.0%} of it "
-                       f"still leaves a {reserve_days}d reserve"))
+                       f"{horizon}d{sub}. {fac[a]}: calm 7 days, {'shadow stock' if (a, d) in cover else 'register'} "
+                       f"shows {units_held / max(use[a, d], 1e-9):.0f}d of use; counting {trust:.0%} of it still "
+                       f"leaves a {reserve_days}d reserve"))
             out["orders"].append({"indent_id": f"RD-{t:03d}-{len(out['orders']) + 1:03d}", "from": fac[a],
                                   "to": fac[b], "item": names[d], "qty_units": units})
     return out
@@ -195,29 +206,32 @@ def _match(donors, need, mins, max_minutes):
 # ---------------- evaluation on SYNTHETIC ground truth ----------------
 
 def posteriors(run, obs):
-    """Model posteriors per (f, d), built exactly as evaluate.py does (entry-gap skip)."""
+    """Model posteriors and shadow cover per (f, d), built exactly as evaluate.py does."""
     P = run.ix["primaries"]
     given = sum(obs[k][:, :, P].sum(2) for k in G.CATS)
     expected = obs["N"][:, :, P].sum(2)
-    post = {}
+    post, cover = {}, {}
     for f in range(len(run.facilities)):
         skip = FL.entry_gaps(given[:, f], expected[:, f])
         for d in P:
             cats = np.stack([obs[k][:, f, d] for k in G.CATS], 1)
-            post[(f, d)] = FL.filter_series(obs["N"][:, f, d], cats, run.book[:, f, d], obs["exp_units"][:, f, d],
-                                            run.receipts[:, f, d], skip)
-    return post
+            N, rec, book, exp = obs["N"][:, f, d], run.receipts[:, f, d], run.book[:, f, d], obs["exp_units"][:, f, d]
+            rho, tau = FL.learn(N, cats, book, exp, rec, skip)
+            post[(f, d)] = p = FL.filter_series(N, cats, book, exp, rec, skip, tau=tau, rho=rho)
+            cover[(f, d)] = FL.shadow_cover(book, rec, obs["units"][:, f, d], FL.trailing_mean(rho * exp), p, skip)
+    return post, cover
 
 
 def _register_view(run, obs, days=7):
     """Baseline: the same planner fed the register instead of the model. A PHC is short
-    when its register shows under `days` of expected use; every shortage is treated as local."""
+    when its register shows under `days` of expected use; every shortage is treated as local.
+    Returns posteriors and labels_at's stand-in: t -> {(f, d): "LOCAL" while short, else None}."""
     post = {}
     for f in range(len(run.facilities)):
         for d in run.ix["primaries"]:
             short = run.book[:, f, d] < days * FL.trailing_mean(obs["exp_units"][:, f, d])
             post[(f, d)] = np.column_stack([~short, 0 * short, short]).astype(float)
-    return post, {k: "LOCAL" for k in post}
+    return post, lambda t: {k: "LOCAL" if p[t, 2] else None for k, p in post.items()}
 
 
 def evaluate_plan(run, seed=0, days=range(35, 200, 7), horizon=14, reserve_days=14, max_minutes=180):
@@ -226,7 +240,7 @@ def evaluate_plan(run, seed=0, days=range(35, 200, 7), horizon=14, reserve_days=
     obs = G.aggregate(run.ix, run.dx, run.slips, run.na)
     coords = synthetic_coords(run, seed)
     fi, di = {x: i for i, x in enumerate(run.facilities)}, run.ix["di"]
-    model = posteriors(run, obs)
+    model, cover = posteriors(run, obs)
     reg_post, reg_labels = _register_view(run, obs)
     res = {}
     for name in ("anumaan", "register <7d"):
@@ -235,8 +249,9 @@ def evaluate_plan(run, seed=0, days=range(35, 200, 7), horizon=14, reserve_days=
         for t in days:
             if t >= run.book.shape[0]:
                 break
-            post, labels = (model, labels_at(t, run, model, obs)) if name == "anumaan" else (reg_post, reg_labels)
-            p = plan(t, run, post, labels, coords, horizon, reserve_days, max_minutes, obs)
+            post, labels = (model, labels_at(t, run, model, obs, cover)) if name == "anumaan" else (reg_post, reg_labels(t))
+            p = plan(t, run, post, labels, coords, horizon, reserve_days, max_minutes, obs,
+                     cover if name == "anumaan" else None)
             rows = [(fi[x["from_fac"]], fi[x["to_fac"]], di[x["drug"]], x) for x in p["transfers"]]
             sent = Counter()
             for a, _, d, x in rows:
@@ -274,7 +289,8 @@ def main():
              else [int(s) for s in a.seeds.split(",")])
     rs = [evaluate_plan(sim.simulate(seed=s, behaviour=a.behaviour), seed=s) for s in seeds]
     print(f"SYNTHETIC redistribution plans - seeds {a.seeds}, behaviour '{a.behaviour}', a plan every 7 days "
-          f"from day 35; horizon 14d, reserve 14d, same-state arcs <= 180 min, register discount {DISCOUNT}")
+          f"from day 35; horizon 14d, reserve 14d, same-state arcs <= 180 min; donors counted at "
+          f"{SHADOW_TRUST} of their shadow stock (register baseline: {DISCOUNT} of the register)")
     print(f"\n{'':14}{'courses/run':>12}{'to truly short':>16}{'from true surplus':>19}{'min/course':>12}{'need met':>10}")
     for name in ("anumaan", "register <7d"):
         m = [r[name] for r in rs]
@@ -289,10 +305,8 @@ def main():
           "  above the 14-day reserve after everything that donor sent that day. 'register <7d' = the same\n"
           "  planner fed the register instead of the model (short under 7 days of cover, every shortage local).\n"
           "  Donor veto (anumaan only): no donor gives a drug with a WAREHOUSE/STATE/NATIONAL alarm on its warehouse,\n"
-          "  state or country, though those labels are mostly not true upstream failures (escalations line). At this\n"
-          "  discount it trades need met for true surplus (seeds 5-9 pooled, measured once: surplus 0.86 vs 0.81,\n"
-          "  need met 0.20 vs 0.27, to truly short 0.73 vs 0.76 without it); a tighter discount buying the same surplus\n"
-          "  costs more need met, so the veto stays (chosen on seeds 0-4, see DISCOUNT).\n"
+          "  state or country. It barely moves these one-day scores; it stays because such a donor has no resupply\n"
+          "  coming (see SHADOW_TRUST).\n"
           "  Not claimed: plans are never applied to the simulated world, so courses/run sums independent weekly\n"
           "  plans that re-plan the same shortages; minutes are straight-line estimates on SYNTHETIC maps.")
 

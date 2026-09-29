@@ -29,6 +29,11 @@ def test_plan_takes_nearest_safe_surplus_and_escalates_state_failures():
     # the state line alone keeps f3 out; a NATIONAL alarm on the drug stops every donor
     assert PL.plan(t, run, post, {(0, d): "LOCAL"}, coords, obs=obs)["transfers"] == p["transfers"]
     assert PL.plan(t, run, post, {(0, d): "LOCAL", (4, d): "NATIONAL"}, coords, obs=obs)["transfers"] == []
+    # with a shadow stock, donors are sized on it instead: f1 now holds plenty, so it covers everything
+    cover = {(f, d): np.full(run.book.shape[0], 1000.0) for f in (1, 2)}
+    q = PL.plan(t, run, post, labels, coords, obs=obs, cover=cover)
+    assert {x["from_fac"]: x["courses"] for x in q["transfers"]} == {run.facilities[1]: need - 10}
+    assert "shadow stock shows 1000d" in q["transfers"][0]["reason"]
 
 
 def test_travel_times_and_routes_tiles():

@@ -229,9 +229,19 @@ function forecastChart(s, fc) {
 }
 
 /* ---------- detail panel ---------- */
+function evidence(c, p) {   // why triage picked this level, from the warehouse ledger and the diagnoses
+  const filled = c.fill === null ? "" : ` (${pct(c.fill)} of what it asked for in the last four weeks)`;
+  return {
+    LOCAL: `${p.wh} is being supplied by the state${filled} and demand is normal, so the problem is at this PHC.`,
+    WAREHOUSE: `The state has stopped filling ${p.wh}'s indents for this medicine${filled}, while other warehouses in ${p.st} are still supplied.`,
+    "STATE-PROCUREMENT": `The state has stopped filling this medicine's indents at two or more of ${p.st}'s warehouses.`,
+    NATIONAL: "Warehouses in more than one state have stopped receiving this medicine. No single state can fix that.",
+    "DEMAND-SURGE": `Diagnoses across ${p.st} for the conditions this medicine treats are ${pct(c.lift - 1)} above normal, while ${p.wh} is still being supplied. This is a demand surge, not a supply failure.`,
+  }[c.level];
+}
+
 function tree(c, p) {
-  if (c.level === "DEMAND-SURGE")
-    return `<p class="why">Diagnoses for the conditions this medicine treats jumped while deliveries kept arriving. This looks like a demand surge, not a supply failure.</p>`;
+  if (c.level === "DEMAND-SURGE") return "";
   const levels = ["LOCAL", "WAREHOUSE", "STATE-PROCUREMENT", "NATIONAL"];
   const names = [`This PHC (${p.phc})`, p.wh, `${p.st} medical services corporation`, "National supply"];
   const at = levels.indexOf(c.level);
@@ -272,11 +282,12 @@ async function renderDetail() {
   const sure = Math.min(99, Math.round(100 * Math.max(...c.p)));   // never claim certainty
   const truth = c.true === undefined ? "" :
     `<p class="truthline"><strong>Ground truth:</strong> ${fmt(c.true)} ${unit} on the shelf (${c.true_cover} days of use).</p>`;
-  const alarm = !c.alarm ? `<h3>No alarm</h3><p class="why">Care at this PHC matches what the diagnoses call for.</p>` : `
+  const alarm = !c.alarm ? `<h3>No alarm</h3><p class="why">Care at this PHC matches what the diagnoses call for, and deliveries minus dispensing leave more than ${state.meta.low} days of use.</p>` : `
     <h3>Alarm since day ${c.onset}</h3>
-    ${c.level === "LOCAL" ? `<p class="why">Only this PHC is affected so far.</p>` : c.level === "DEMAND-SURGE" ? "" : `<p class="why">Other PHCs went short on the same medicine in the same weeks.</p>`}
+    ${c.by_stock ? `<p class="why">Care still looks normal, but deliveries minus dispensing leave only about ${c.shadow} days of use. The shelf is running down before anyone has started rationing.</p>` : ""}
+    <p class="why">${evidence(c, p)}</p>
     ${tree(c, p)}
-    <p class="action ${["LOCAL", "WAREHOUSE", "DEMAND-SURGE"].includes(c.level) ? "local" : ""}"><strong>Suggested next step:</strong> ${esc(state.meta.actions[c.level])}. Treat where it broke as a first guess to check, not a verdict.</p>`;
+    <p class="action ${["LOCAL", "WAREHOUSE", "DEMAND-SURGE"].includes(c.level) ? "local" : ""}"><strong>Suggested next step:</strong> ${esc(state.meta.actions[c.level])}. Where it broke is read from the warehouse ledger; confirm with the district store before escalating.</p>`;
   const asked = c.confirmed ? `<p class="done">The pharmacist said: ${c.confirmed === "empty" ? "it's finished" : "we have it"}.</p>` : "";
   const panel = $("#detail");
   if (state.fresh) {
@@ -293,6 +304,7 @@ async function renderDetail() {
       <div class="reg"><small>Register says</small><span class="ledger big${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unit}, about ${c.cover} days of use</small></div>
       <div class="shelf is-${cls}"><small>Shelf, inferred from care</small><span class="big">${word}</span><span class="meter" aria-hidden="true"><i style="width:${sure}%"></i></span><small>${sure}% sure</small></div>
     </div>
+    <p class="why">Deliveries in, minus what the dispensing slips took out: about <strong>${fmt(c.shadow)} days</strong> of use left${c.shadow < state.meta.low ? `, under the ${state.meta.low}-day warning line` : ""}.</p>
     ${truth}
     <section>
       <h3>What the care shows</h3>
@@ -420,8 +432,8 @@ function renderNational(n) {
   }).join("");
   const flags = Object.entries(n.view).flatMap(([drug, v]) => {
     const j = drugOf(drug), out = [];
-    if (v.national) out.push(`<li><strong>${drugName(j)}</strong>: short in several districts across states. Possible national supply failure. This flag is experimental and missed every national failure in testing.</li>`);
-    if (v.surge) out.push(`<li><strong>${drugName(j)}</strong>: demand is surging across states. Raise indents.</li>`);
+    if (v.national) out.push(`<li><strong>${drugName(j)}</strong>: warehouses in ${v.short_states.map(stateName).join(" and ")} have stopped receiving it. Likely national supply failure. In testing this flag caught every injected national failure, about a month in and before most of the PHC stock-outs it caused.</li>`);
+    else if (v.surge) out.push(`<li><strong>${drugName(j)}</strong>: demand is surging across states. Raise indents.</li>`);   // a supply break outranks a surge, as in triage
     return out;
   }).join("");
   const priors = Object.entries(n.priors).map(([drug, p]) =>
@@ -429,7 +441,7 @@ function renderNational(n) {
   $("#national").innerHTML = `<div class="scroll"><table class="data"><thead><tr><th scope="col">State</th><th scope="col">Share of PHC medicines</th><th scope="col" class="num">Stocked</th><th scope="col" class="num">Running short</th><th scope="col" class="num">Empty</th><th scope="col" class="num">Kept inside the state</th><th scope="col" class="num">Sent to the national view</th></tr></thead><tbody>${rows}</tbody></table></div>
     <h3>Patterns across states</h3>${flags ? `<ul class="plain">${flags}</ul>` : `<p class="note">No medicine shows a cross-state pattern today.</p>`}
     <details><summary>What states get back</summary>
-      <p class="note">National medians a new state can start from instead of waiting a month: how closely prescribing follows the rulebook, and how far registers can be trusted. In testing this made little difference to detection.</p>
+      <p class="note">National medians a new state can start from instead of waiting a month: how closely prescribing follows the rulebook, and how far registers can be trusted. In testing, a state three days in had about 40% fewer false alarms with these than with its own three days, the same as a month of its own history.</p>
       <div class="scroll"><table class="data"><thead><tr><th scope="col">Medicine</th><th scope="col" class="num">Prescribing follows the rulebook</th><th scope="col" class="num">Register trust</th></tr></thead><tbody>${priors}</tbody></table></div>
     </details>`;
 }
@@ -445,7 +457,7 @@ function proof(m) {
     ["Simple threshold on the same rulebook", m.crg_rule]].filter(([, r]) => r);
   $("#proof").innerHTML = `<thead><tr><th scope="col">Method</th><th scope="col">Stock-outs of 4+ days caught</th><th scope="col">Warned before the shelf emptied</th><th scope="col">Typical warning</th><th scope="col" class="num">False alarms per medicine per year</th></tr></thead>
     <tbody>${rows.map(([n, r], k) => `<tr${k ? "" : ' class="lead"'}><th scope="row">${n}</th>${meter(r.recall_4d)}${meter(r.early)}<td>${lead(r.median_lead)}</td><td class="num">${r.false_per_series_year.toFixed(2)}</td></tr>`).join("")}</tbody>`;
-  $("#triageNote").textContent = `Where it broke is still a first guess: right for ${pct(m.triage_7d.episodes)} of supply failures a week after the alarm, against ${pct(m.triage_majority)} for always guessing the commonest cause. Early warning depends on staff rationing before the shelf empties; without it, Anumaan still catches most outages, about two days after they start.`;
+  $("#triageNote").textContent = `Where it broke is read from the warehouse ledger: right for ${pct(m.triage_7d.accuracy)} of alarms a week after they start, against ${pct(m.triage_majority)} for always guessing the commonest cause. Early warning comes from staff rationing and from deliveries minus dispensing; where staff never ration, Anumaan still warns before the shelf empties for more than half of outages.`;
 }
 
 async function init() {

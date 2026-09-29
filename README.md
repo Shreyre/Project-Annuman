@@ -13,18 +13,19 @@ Built for **Build with AI: Code for Communities, Second Edition**, Track 03 (Sma
    - The register is one more sensor, weighted by how well that PHC's register tracked reality in its first month.
    - A day with no slips entered on any medicine is a data-entry gap, not a stock-out.
    - A pharmacist's shelf check, by button or by voice, replaces the day's belief.
-3. **Localise and act.** Alarm onsets are clustered up the supply tree (PHC, warehouse, state medical services corporation, national). A demand surge is told apart from a supply failure. Then Google OR-Tools plans same-state transfers in treatment courses from PHCs that have been calm all week, and escalates what moving stock cannot fix. See `anumaan/triage.py` and `anumaan/planner.py`.
+   - A **shadow stock** warns before the shelf empties even where staff never ration. It is the register's opening balance plus deliveries, minus what the dispensing slips took out. Registers post issues late or never; the slips are the issues. It is reset to zero whenever the care shows the shelf empty. Under 8 days of use left raises an alarm.
+3. **Localise and act.** "Where it broke" is read from the warehouse ledger (DVDMS records each district warehouse's weekly indent to the state and what arrived). A warehouse whose indents the state has stopped filling is starved. One starved warehouse is a warehouse failure, two or more in a state is a state procurement failure, and two or more in each of two states is national. If supply is still flowing, a state-wide jump in diagnoses marks a demand surge; otherwise the problem is at the PHC. Then Google OR-Tools plans same-state transfers in treatment courses from PHCs that have been calm all week, sized on their shadow stock, and escalates what moving stock cannot fix. See `anumaan/triage.py` and `anumaan/planner.py`.
 4. **See beds, staff and demand.**
    - **Beds** come from the admission-discharge feed, with stays that were never closed auto-closed after 5 days.
    - **Staff** are checked against the care record, by role only: a doctor marked present but with no prescriptions on a 40-patient day gets flagged.
    - **Demand** for the next 14 days is forecast from diagnoses through the grammar, not from dispensing that stock-outs have already cut.
 
    See `anumaan/care.py` and `anumaan/forecast.py`.
-5. **Federate.** Each state keeps its own diagnoses and slips. Only counts per district and medicine cross the state line, through a gate that rejects anything raw and any group under five PHCs. The national view spots cross-state patterns and hands back shared starting parameters. See `anumaan/federation.py`.
+5. **Federate.** Each state keeps its own diagnoses, slips and warehouse ledger. Only counts per district and medicine cross the state line, plus whether the state has stopped supplying that district's warehouse. They pass a gate that rejects anything raw and any group under five PHCs. The national view flags a national shortage when starved warehouses show up in two or more states, and hands back shared starting parameters for new states. See `anumaan/federation.py`.
 
 ## Results so far: synthetic data only
 
-There is no public patient-level dispensing data in India, so everything below comes from a simulator (`anumaan/sim.py`). It mimics the shape of the real feeds and injects failures as hidden ground truth. It is deliberately messy: part-filled indents, upstream failures that still trickle supply, 30-90 day warehouse buffers, a monsoon surge, data-entry gaps, registers that drift, and substitutes that fail too.
+There is no public patient-level dispensing data in India, so everything below comes from a simulator (`anumaan/sim.py`). It mimics the shape of the real feeds and injects failures as hidden ground truth. It is deliberately messy: part-filled indents, upstream failures that still trickle supply, 30-90 day warehouse buffers, a monsoon surge, data-entry gaps, registers that drift, substitutes that fail too, and a warehouse ledger posted 0-10 days late that loses 5% of receipts.
 
 Thresholds were tuned on seeds 0-4. Every number below is from **held-out seeds 5-9**. Each module's CLI reproduces its numbers.
 
@@ -32,11 +33,21 @@ Thresholds were tuned on seeds 0-4. Every number below is from **held-out seeds 
 
 | Behaviour of frontline staff | Stock-outs of 4+ days caught | Warned before the shelf emptied | False alarms per medicine per PHC per year | Register tuned to the same false-alarm budget |
 |---|---|---|---|---|
-| Ration when stock runs low (default) | 98-100% | 86-96% (median 4-7 days ahead) | 0.02-0.07 | 9-35% caught |
-| Different behaviour model, no "not available" slips (`--behaviour alt`) | 96-98% | 31-37% | 0.03-0.07 | 21-59% caught |
-| Never ration (`--ration 0`) | 92-97% | 3-8% (about 2 days *after*) | 0.01-0.04 | 5-41% caught |
+| Ration when stock runs low (default) | 98-100% | 92-98% (median 5-7 days ahead) | 0.02-0.08 | 9-35% caught |
+| Different behaviour model, no "not available" slips (`--behaviour alt`) | 98-100% | 65-74% (3-4 days ahead) | 0.03-0.10 | 21-59% caught |
+| Never ration (`--ration 0`) | 97-99% | 54-61% (2-3 days ahead) | 0.03-0.04 | 5-41% caught |
 
-Without diagnoses (the same filter run on each medicine's dispensing history) Anumaan catches as many stock-outs, but with 20x or more false alarms.
+Where staff do not ration, the warning comes from the shadow stock. The care record alone warns for only 31-37% (alt) and 3-8% (never ration) of stock-outs, and catches 66-70% of all stock-outs instead of 90-93% when staff never ration. Without diagnoses (the same filter and shadow stock run on each medicine's dispensing history) Anumaan catches as many stock-outs, but with 20x or more false alarms.
+
+**Where it broke** (same runs, labelled 7 days after the alarm)
+
+| Behaviour of frontline staff | Stock-outs labelled right | Right on average per cause | Always guessing the commonest cause |
+|---|---|---|---|
+| Default | 80-92% | 72-91% | 37-46% |
+| Alt | 82-89% | 74-88% | 42-56% |
+| Never ration | 82-93% | 73-88% | 44-52% |
+
+Before the warehouse ledger, clustering alarms up the supply tree scored 36-56% on default: no better than guessing.
 
 **The other modules**
 
@@ -45,21 +56,21 @@ Without diagnoses (the same filter run on each medicine's dispensing history) An
 | Beds (`python -m anumaan.care`) | Count off by 0.30-0.36 beds on average, against 2.0-2.4 for plain admitted-minus-discharged | A quarter to a third of "every bed taken" days are artefacts of unrecorded discharges |
 | Staff | "Marked present, no work on a busy day" flags are right 96-97% of the time and catch 69-76% of false attendance | A simple ratio rule does nearly as well; staff nurses are too rarely busy to check (recall about 0) |
 | Forecast (`python -m anumaan.forecast`) | 14-day demand error (WAPE) 0.068-0.076 from diagnoses, against 0.119-0.128 for consumption with stock-out days filled in | Part of the edge is built in, because the simulator defines demand as diagnoses times the grammar. After stock-outs the lead is only 1.1-2.0x. Neither method sees the monsoon coming |
-| Redistribution (`python -m anumaan.planner`) | 60-86% of planned courses go to PHCs that are truly short (a register-driven plan manages 47-61%); 79-91% come from PHCs with true surplus | It meets only 18-23% of the need, which is less than the register plan. It trades volume for not stripping donors |
-| Federation (`python -m anumaan.federation`) | About 5 KB of counts leave each state instead of about 125,000 raw records; the gate rejects doctored exports | The national-shortage flag caught **0 of 5** injected national failures. Shared priors gave no measurable cold-start gain |
+| Redistribution (`python -m anumaan.planner`) | 73-90% of planned courses go to PHCs that are truly short (a register-driven plan manages 47-61%); 86-91% come from PHCs with true surplus; it meets 46-53% of the need (register plan 30-38%). 64-100% of escalations are true state or national failures | Plans are never applied to the simulated world, so each week re-plans the same shortages. Travel times are straight-line estimates |
+| Federation (`python -m anumaan.federation`) | About 5 KB of counts leave each state instead of about 125,000 raw records; the gate rejects doctored exports. The national-shortage flag caught **5 of 5** injected national failures with no flags on other medicines, ahead of 44 of the 54 PHC stock-outs they caused. Shared priors cut a 3-day-old state's false alarms from 0.07 to 0.04 per medicine per PHC per year (fewer in 8 of 10 cold states), the same as a 30-day warm-up | The flag goes up 26-35 days into a failure, after the first PHCs have run out. The priors gain is small in absolute terms: the care filter needs little calibration, and the gain comes through the shadow stock's days of use |
 
 What we are **not** claiming overall:
 
-- **Early warning comes from staff rationing before the shelf empties.**
-- **"Where it broke" is a first guess.** On held-out seeds it scores about 35-60% per stock-out, no better than always guessing the commonest cause. State and national failures are mostly missed, because warehouses run dry weeks apart. The likely fix is DVDMS warehouse stock and indent/issue records.
+- **The shadow stock is only as good as its first balance and the slips.** It starts from the register's opening balance, so an overstated opening delays the first warning until the care shows an empty shelf and resets it. A shelf count at go-live fixes that. A PHC that dispenses without writing slips would fool it.
+- **"Where it broke" needs the warehouse ledger.** The simulator's ledger is cleaner than a real DVDMS feed: late and lossy, but otherwise exact. A state without one gets only "at this PHC" or "demand surge". The scorer counts a stock-out during an upstream failure as that failure even when its own warehouse still had stock; the ledger sees those failures because the indents stop being filled.
 - **The simulator is kinder than reality.** Its shelves are stocked 97-99% of the time, while Indian PHC surveys report 72-75%.
-- **Nothing has been validated on real data yet.** A pilot would check against real signals first, such as HMIS "discharged under 48 hours" and state drug-availability dashboards.
+- **Nothing has been validated on real data yet.** A pilot would check against real signals first, such as HMIS "discharged under 48 hours", state drug-availability dashboards and DVDMS warehouse records.
 
 ## Run it
 
 ```bash
 pip install -e ".[app,gemini,dev]"                 # numpy, ortools, fastapi, uvicorn, google-genai, pytest
-python -m pytest -q                               # 17 checks, incl. held-out end-to-end runs and the app
+python -m pytest -q                               # 20 checks, incl. held-out end-to-end runs and the app
 python -m anumaan.evaluate --seeds 5-9            # detection table; also --behaviour alt, --ration 0
 python -m uvicorn app.main:app --port 8788        # demo at http://127.0.0.1:8788
 ```
@@ -92,14 +103,14 @@ To go live:
 | Path | What |
 |---|---|
 | `anumaan/crg.py` | Loads the grammar; decodes slips into full / cut short / substitute / not available |
-| `anumaan/filter.py` | Per PHC x medicine Bayesian filter, data-entry gaps, learned register trust, shelf checks |
-| `anumaan/triage.py` | Supply-tree onset clustering and demand-surge detection |
-| `anumaan/planner.py` | OR-Tools min-cost-flow transfers in treatment courses, escalations, DVDMS-style orders |
+| `anumaan/filter.py` | Per PHC x medicine Bayesian filter, data-entry gaps, learned register trust, shelf checks, shadow stock |
+| `anumaan/triage.py` | Where it broke, from the warehouse ledger's unfilled indents and state-wide demand |
+| `anumaan/planner.py` | OR-Tools min-cost-flow transfers in treatment courses, donors sized on the shadow stock, escalations, DVDMS-style orders |
 | `anumaan/forecast.py` | Diagnosis-driven demand forecast and the fair consumption baseline |
 | `anumaan/care.py` | Beds from the admission-discharge feed; staff attendance checked against the care record |
 | `anumaan/federation.py` | State nodes, the clean-room gate, the national view and shared priors |
 | `anumaan/voice.py` | Gemini voice shelf check with a safe fallback |
-| `anumaan/sim.py`, `anumaan/evaluate.py` | SYNTHETIC network with injected failures; held-out scoring against fair baselines |
+| `anumaan/sim.py`, `anumaan/evaluate.py` | SYNTHETIC network with injected failures and a DVDMS-style warehouse ledger; held-out scoring against fair baselines |
 | `grammar/` | Gemini grammar compiler; `crg/tracer.json` is a **hand-written development seed, not verified against guidelines** |
 | `app/` | FastAPI service and the demo page |
 | `deploy/`, `Dockerfile` | Cloud Run deployment and budget alert |
@@ -112,9 +123,9 @@ To go live:
 | Bed availability | Done on synthetic replay (plain admission-discharge count first) |
 | Staff attendance | Done on synthetic replay, by role only |
 | Demand forecasting | Done: diagnosis-driven, with an uncertainty band |
-| Early warning of stock-outs | Done, with the rationing caveat |
+| Early warning of stock-outs | Done: from staff rationing, and from the shadow stock where staff do not ration |
 | Cross-district redistribution | Done: OR-Tools transfers within a state, plus escalations |
-| Federated, shared modelling across states | Done as a code boundary that mirrors per-state projects; the national flag and shared priors are weak (see above) |
+| Federated, shared modelling across states | Done as a code boundary that mirrors per-state projects: a national-shortage flag from the states' warehouse exports, and shared priors for new states |
 | Google AI doing meaningful work | Gemini grammar and voice are built but not yet run; they need Vertex AI billing |
 | Multilingual / voice | Odia buttons; a spoken answer in any language through Gemini once it is configured |
 | Live deployed link | Pending billing on `anumaan-c4c` |

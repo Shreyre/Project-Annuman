@@ -44,12 +44,29 @@ def test_only_gated_aggregates_reach_the_national_project():
                 dict(ex, rows=[dict(ex["rows"][0], onsets=["S0-W0-P3"])]),   # facility id
                 dict(ex, rows=[dict(ex["rows"][0], n="6")]),                 # not a count
                 dict(ex, rows=[dict(ex["rows"][0], OK=1, SCARCE=0, OUT=0)]), # counts that do not add up
+                dict(ex, rows=[dict(ex["rows"][0], starved=2)]),             # a warehouse flag is 0 or 1
                 dict(ex, rows=[dict(ex["rows"][0], n=3)])):                  # group under k
         with pytest.raises(AssertionError):
             nat.ingest(bad)
+
+
+def test_national_flag_catches_the_injected_failure_and_nothing_else():
+    run = sim.simulate(seed=5)                                     # held out
+    nodes = [FED.StateNode(run, s) for s in ("S0", "S1")]
+    ep = next(e for e in run.episodes if e["type"] == "NATIONAL" and not e.get("secondary"))
+    flagged = set()
+    for t in range(0, run.book.shape[0], 5):
+        nat = FED.National()
+        for n in nodes:
+            nat.ingest(n.export(t))
+        flagged |= {(d, ep["start"] <= t < ep["end"]) for d, v in nat.view().items() if v["national"]}
+    assert (run.ix["drugs"][ep["drug"]], True) in flagged
+    assert {d for d, _ in flagged} == {run.ix["drugs"][ep["drug"]]}
 
 
 def test_cold_start_with_national_priors_still_detects():
     r = FED.cold_start(sim.simulate(seed=5), "S1", ks=(3,))[3]
     assert r["priors"]["events"] > 20
     assert r["priors"]["recall_4d"] >= 0.9 and r["priors"]["false_per_series_year"] <= 0.15
+    # three days of local history learn rho too roughly for the shadow stock; the priors fix that
+    assert r["priors"]["false_per_series_year"] < 0.5 * r["local"]["false_per_series_year"]

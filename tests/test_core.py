@@ -28,6 +28,21 @@ def test_data_entry_gap_is_not_a_stockout():
     assert post[40:44, 2].max() < 0.3
 
 
+def test_shadow_stock_warns_before_the_shelf_empties_without_rationing():
+    # 300 units, 10 dispensed a day in full, no delivery: empty on day 30. The register never
+    # posts an issue and care looks normal until the shelf is bare.
+    T = 40
+    cats = np.zeros((T, 4))
+    cats[:30, 0] = 10                    # full courses...
+    cats[30:, 3] = 3                     # ...then not-available slips
+    units = np.where(np.arange(T) < 30, 10.0, 0.0)
+    book, rec, ten = np.full(T, 300.0), np.zeros(T), np.full(T, 10.0)
+    post = FL.filter_series(ten, cats, book, ten, rec)
+    cover = FL.shadow_cover(book, rec, units, ten, post)
+    assert FL.alarms(post)[0][0] >= 29                   # care alone: only once it is empty
+    assert FL.alarms(post, cover=cover)[0][0] == 23      # under 8 days left: a week ahead
+
+
 def test_beats_the_register_on_a_held_out_network():
     for behaviour in ("default", "alt"):
         r = evaluate(sim.simulate(seed=5, behaviour=behaviour))   # tuning used seeds 0-4
@@ -36,5 +51,9 @@ def test_beats_the_register_on_a_held_out_network():
         assert m["false_per_series_year"] <= 0.15
         assert m["recall_4d"] > r["register_best"]["recall_4d"] + 0.3        # same false-alarm budget
         assert r["drug_only"]["false_per_series_year"] > 5 * m["false_per_series_year"]   # diagnoses earn their place
-    # early warning exists only because staff ration before the shelf empties (see --ration 0)
+        assert r["triage_7d"]["accuracy"] > r["triage_majority"] + 0.25      # where it broke: well past the commonest-cause guess
     assert evaluate(sim.simulate(seed=5))["model"]["early"] >= 0.8
+    # staff who never ration give care no early sign; the shadow stock still warns for most outages
+    r = evaluate(sim.simulate(seed=5, p_ration=0.0))
+    assert r["care_only"]["early"] < 0.15 and r["model"]["early"] >= 0.45
+    assert r["model"]["false_per_series_year"] <= 0.15
