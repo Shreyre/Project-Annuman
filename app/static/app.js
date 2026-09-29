@@ -1,12 +1,14 @@
 const $ = (s) => document.querySelector(s);
 const state = { meta: null, day: 0, truth: false, sel: null, timer: null, rec: null,
-  cache: new Map(), side: new Map(), dayData: null };
+  cache: new Map(), side: new Map(), dayData: null, cells: [], byKey: new Map(), prevPhantom: null, prevDay: null, fresh: false };
 const REGIME = { OK: ["ok", "Stocked"], SCARCE: ["scarce", "Running short"], OUT: ["out", "Empty"] };
 const WORD = { tab: "tablets", cap: "capsules", sachet: "sachets" };
 const CADRE = { MO: "Medical officer", SN: "Staff nurse", PH: "Pharmacist", LT: "Lab technician" };
 const fmt = (n) => Math.round(n).toLocaleString("en-IN");
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 const pct = (x) => (x === null || x === undefined || Number.isNaN(x) ? "n/a" : `${Math.round(100 * x)}%`);
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function drugName(j) {   // names come from the (Gemini-compiled) rulebook, so escape them
   const [name, strength] = state.meta.drugs[j].name.split(/_(?=[^_]+$)/);
@@ -17,10 +19,10 @@ const drugOf = (name) => state.meta.drugs.findIndex((d) => d.name === name);
 const unitOf = (j) => WORD[state.meta.drugs[j].unit] || "units";
 function place(f) {
   const [s, w, p] = state.meta.facilities[f].id.split("-");
-  return { st: `State ${+s.slice(1) + 1}`, wh: `Warehouse ${String.fromCharCode(65 + +w.slice(1))}`, phc: `PHC ${+p.slice(1) + 1}` };
+  return { st: `State\u00a0${+s.slice(1) + 1}`, wh: `Warehouse\u00a0${String.fromCharCode(65 + +w.slice(1))}`, phc: `PHC\u00a0${+p.slice(1) + 1}` };   // never split "PHC 6" across lines
 }
 const facOf = (id) => state.meta.facilities.findIndex((x) => x.id === id);
-const stateName = (id) => `State ${+id.slice(1) + 1}`;
+const stateName = (id) => `State\u00a0${+id.slice(1) + 1}`;
 async function get(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${url} answered ${r.status}`);
@@ -31,36 +33,106 @@ async function cached(map, key, url) {
   return map.get(key);
 }
 
+/* ---------- the network grid: one table per state, warehouses as row groups ---------- */
 function buildGrid() {
   const { facilities, drugs } = state.meta;
-  const head = `<thead><tr><th scope="col">PHC</th>${drugs.map((_, j) => `<th scope="col" class="drug">${drugName(j)}</th>`).join("")}</tr></thead>`;
-  let body = "", lastSt = "", lastWh = "";
+  const head = `<thead><tr><td colspan="2"></td>${drugs.map((_, j) => `<th scope="col" class="drug" data-j="${j}"><span>${drugName(j)}</span></th>`).join("")}</tr></thead>`;
+  const byState = new Map();
   facilities.forEach((fac, f) => {
-    const p = place(f);
-    if (p.st !== lastSt) { body += `<tr class="state"><th colspan="${drugs.length + 1}" scope="rowgroup">${p.st}</th></tr>`; lastSt = p.st; }
-    if (fac.wh !== lastWh) { body += `<tr class="wh"><th colspan="${drugs.length + 1}" scope="rowgroup">${p.wh}</th></tr>`; lastWh = fac.wh; }
-    body += `<tr><th scope="row" class="phc">${p.phc}</th>${drugs.map((_, j) => `<td><button type="button" class="cell" data-f="${f}" data-j="${j}"></button></td>`).join("")}</tr>`;
+    if (!byState.has(fac.st)) byState.set(fac.st, new Map());
+    const whs = byState.get(fac.st);
+    if (!whs.has(fac.wh)) whs.set(fac.wh, []);
+    whs.get(fac.wh).push(f);
   });
-  $("#grid").innerHTML = head + `<tbody>${body}</tbody>`;
-  $("#grid").addEventListener("click", (e) => {
+  let html = "";
+  for (const [st, whs] of byState) {
+    let body = "", r = 0;
+    for (const fs of whs.values()) {
+      body += "<tbody>" + fs.map((f, i) => {
+        const p = place(f);
+        const wh = i ? "" : `<th scope="rowgroup" rowspan="${fs.length}" class="wh"><span>${p.wh}</span></th>`;
+        const row = `<tr>${wh}<th scope="row" class="phc">${p.phc}</th>${drugs.map((_, j) =>
+          `<td><button type="button" class="cell" data-f="${f}" data-j="${j}" style="--r:${r};--c:${j}"></button></td>`).join("")}</tr>`;
+        r++;
+        return row;
+      }).join("") + "</tbody>";
+    }
+    html += `<div class="state-block"><h3>${stateName(st)} <span class="st-count" data-st="${st}"></span></h3>
+      <table class="grid">${head}${body}</table></div>`;
+  }
+  const grid = $("#grid");
+  grid.innerHTML = html;
+  grid.querySelectorAll(".cell").forEach((b) => { state.cells[+b.dataset.f * drugs.length + +b.dataset.j] = b; });
+  grid.addEventListener("click", (e) => {
     const b = e.target.closest(".cell");
-    if (b) select(+b.dataset.f, +b.dataset.j);
+    if (b) select(+b.dataset.f, +b.dataset.j, true);
   });
+  grid.addEventListener("pointerover", (e) => { const b = e.target.closest(".cell"); if (b && e.pointerType === "mouse") showTip(b); });
+  grid.addEventListener("pointerout", (e) => { if (e.target.closest(".cell")) hideTip(); });
+  grid.addEventListener("focusin", (e) => { const b = e.target.closest(".cell"); if (b) showTip(b); });
+  grid.addEventListener("focusout", hideTip);
+  addEventListener("scroll", hideTip, { passive: true });
 }
 
 function paintGrid(data) {
+  const J = state.meta.drugs.length, count = { ok: 0, scarce: 0, out: 0, phantom: 0 }, perState = {};
+  const phantoms = new Set(), stepped = state.prevPhantom && Math.abs(data.day - state.prevDay) === 1;
+  state.byKey.clear();
   for (const c of data.cells) {
-    const b = document.querySelector(`.cell[data-f="${c.f}"][data-j="${c.j}"]`);
+    const b = state.cells[c.f * J + c.j], key = c.f * J + c.j;
     const [cls, word] = REGIME[c.regime];
-    b.className = `cell ${cls}${c.phantom ? " phantom" : ""}${state.sel && state.sel.f === c.f && state.sel.j === c.j ? " sel" : ""}`;
+    state.byKey.set(key, c);
+    if (c.phantom) {
+      phantoms.add(key);
+      count.phantom++;
+      const st = state.meta.facilities[c.f].st;
+      perState[st] = (perState[st] || 0) + 1;
+    } else count[cls]++;
+    const isNew = c.phantom && stepped && !state.prevPhantom.has(key);
+    const sel = state.sel && state.sel.f === c.f && state.sel.j === c.j;
+    b.className = `cell ${cls}${c.phantom ? " phantom" : ""}${sel ? " sel" : ""}${isNew && !calm() ? " flash" : ""}`;
     const p = place(c.f);
     b.setAttribute("aria-label", `${p.phc}, ${p.wh}, ${drugName(c.j)}: register ${fmt(c.book)}, shelf ${word.toLowerCase()}${c.phantom ? ", register disagrees" : ""}`);
     b.innerHTML = c.true === undefined ? "" :
       `<span class="truthdot ${c.true_cover < 0.5 ? "t-out" : c.true_cover < 7 ? "t-low" : "t-ok"}" aria-hidden="true"></span>`;
   }
+  state.prevPhantom = phantoms;
+  state.prevDay = data.day;
+  for (const [k, n] of Object.entries(count)) $(`#legend b[data-k="${k}"]`).textContent = n;
+  document.querySelectorAll(".st-count").forEach((el) => {
+    const n = perState[el.dataset.st] || 0;
+    el.textContent = n ? `${n} hidden ${n === 1 ? "stock-out" : "stock-outs"}` : "Registers agree";
+    el.classList.toggle("has", n > 0);
+  });
 }
 
-function headline(data) {
+const tip = $("#tip");
+function mark(b, on) {
+  b.closest("table").querySelector(`th.drug[data-j="${b.dataset.j}"]`).classList.toggle("hl", on);
+  b.closest("tr").querySelector("th.phc").classList.toggle("hl", on);
+}
+function showTip(b) {
+  const c = state.byKey.get(+b.dataset.f * state.meta.drugs.length + +b.dataset.j);
+  if (!c) return;
+  const p = place(c.f), [, word] = REGIME[c.regime], unit = unitOf(c.j);
+  tip.innerHTML = `<strong>${drugName(c.j)}</strong><span>${p.phc}, ${p.wh}</span>
+    <span>Register: ${fmt(c.book)} ${unit}</span><span${c.phantom ? ' class="alert"' : ""}>Shelf: ${word.toLowerCase()}${c.phantom ? ", register disagrees" : ""}</span>
+    ${c.true === undefined ? "" : `<span>Ground truth: ${fmt(c.true)} ${unit}</span>`}`;
+  tip.hidden = false;
+  const r = b.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+  const below = r.top < h + 16 + 64;
+  tip.classList.toggle("below", below);
+  tip.style.left = `${Math.min(Math.max(r.left + r.width / 2, w / 2 + 8), innerWidth - w / 2 - 8)}px`;
+  tip.style.top = `${below ? r.bottom : r.top}px`;
+  document.querySelectorAll("th.hl").forEach((th) => th.classList.remove("hl"));
+  mark(b, true);
+}
+function hideTip() {
+  tip.hidden = true;
+  document.querySelectorAll("th.hl").forEach((th) => th.classList.remove("hl"));
+}
+
+function headline(data, draw = false) {
   const n = data.summary.phantom;
   let html = n
     ? `${n} ${n === 1 ? "shelf" : "shelves"} the register calls stocked ${n === 1 ? "is" : "are"} actually empty.`
@@ -70,18 +142,25 @@ function headline(data) {
     const p = place(c.f);
     html += ` At ${p.phc}, ${p.wh}, the register still reads <span class="ledger struck">${fmt(c.book)}</span> ${unitOf(c.j)} of ${drugName(c.j).toLowerCase()}.`;
   }
-  $("#phantomLine").innerHTML = html;
+  const line = $("#phantomLine");
+  line.classList.toggle("draw", draw);
+  line.innerHTML = html;
+}
+
+function setDay(t) {
+  $("#day").value = t;
+  $("#dayOut").textContent = t;
+  $("#day").style.setProperty("--p", `${(100 * t) / (state.meta.days - 1)}%`);
 }
 
 async function show(t) {
   state.day = t;
-  $("#day").value = t;
-  $("#dayOut").textContent = t;
+  setDay(t);
   const data = await cached(state.cache, `${t}|${state.truth}`, `/api/day/${t}${state.truth ? "?truth=true" : ""}`);
   if (state.day !== t) return;
   state.dayData = data;
   paintGrid(data);
-  headline(data);
+  headline(data, state.fresh);
   if (state.sel) renderDetail();
   const [plan, nat] = await Promise.all([cached(state.side, `plan|${t}`, `/api/plan?t=${t}`),
     cached(state.side, `nat|${t}`, `/api/national?t=${t}`)]);
@@ -90,21 +169,25 @@ async function show(t) {
   renderNational(nat);
 }
 
-function select(f, j) {
+function select(f, j, byUser = false) {
   state.sel = { f, j };
+  state.fresh = true;
   paintGrid(state.dayData);
-  headline(state.dayData);
+  headline(state.dayData, true);
   renderDetail();
   const plan = state.side.get(`plan|${state.day}`);
   if (plan) renderMoves(plan);
+  if (byUser && matchMedia("(max-width: 960px)").matches)
+    $("#detail").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "start" });
 }
 
+/* ---------- charts ---------- */
 function svg(W, H, label, body) {
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}">${body}</svg>`;
 }
 
 function chart(s) {
-  const n = s.N.length, from = Math.max(0, n - 30), W = 320, H = 120, pad = 18;
+  const n = s.N.length, from = Math.max(0, n - 30), W = 320, H = 124, pad = 18;
   const days = s.N.slice(from).map((_, i) => from + i);
   const tot = (i) => s.full[i] + s.ration[i] + s.sub[i] + s.na[i];
   const top = Math.max(1, ...days.map((i) => Math.max(s.N[i], tot(i))));
@@ -112,17 +195,19 @@ function chart(s) {
   const colors = [["full", "var(--ok)"], ["ration", "var(--scarce)"], ["sub", "var(--sub)"], ["na", "var(--out)"]];
   let bars = "", line = "";
   days.forEach((i, k) => {
-    let base = 0;
+    let base = 0, rects = "";
     for (const [key, col] of colors) {
       const v = s[key][i];
-      if (v > 0) bars += `<rect x="${pad + k * bw + 1}" y="${y(base + v)}" width="${bw - 2}" height="${y(base) - y(base + v)}" fill="${col}"/>`;
+      if (v > 0) rects += `<rect x="${pad + k * bw + 1}" y="${y(base + v)}" width="${bw - 2}" height="${y(base) - y(base + v)}" fill="${col}" stroke="var(--surface)" stroke-width="1"/>`;
       base += v;
     }
+    bars += `<g class="bar" style="--k:${k}"><title>Day ${i}: ${fmt(s.N[i])} courses called for. ${fmt(s.full[i])} full, ${fmt(s.ration[i])} cut short, ${fmt(s.sub[i])} substituted, ${fmt(s.na[i])} not available.</title>
+      <rect class="hit" x="${pad + k * bw}" y="4" width="${bw}" height="${H - pad - 4}" rx="2"/>${rects}</g>`;
     line += `${k ? "L" : "M"}${pad + k * bw + bw / 2},${y(s.N[i])}`;
   });
   return svg(W, H, `Last ${days.length} days: courses the diagnoses called for, against what was dispensed`, `
     <line x1="${pad}" x2="${W}" y1="${H - pad}" y2="${H - pad}" stroke="var(--rule)"/>
-    ${bars}<path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    ${bars}<path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 3" pointer-events="none"/>
     <text x="${pad}" y="${H - 4}" font-size="10" fill="var(--muted)">day ${days[0]}</text>
     <text x="${W}" y="${H - 4}" font-size="10" fill="var(--muted)" text-anchor="end">day ${days[days.length - 1]}</text>`);
 }
@@ -133,16 +218,17 @@ function forecastChart(s, fc) {
   const x = (i) => pad + (i / (n - 1)) * (W - pad), y = (v) => H - pad - (v / top) * (H - pad * 1.5);
   const path = (vals, off) => vals.map((v, i) => `${i ? "L" : "M"}${x(i + off)},${y(v)}`).join("");
   const band = fc.lo[0] === null ? "" :
-    `<path d="${path(fc.hi, hist.length)}L${fc.lo.map((v, i) => `${x(hist.length + fc.lo.length - 1 - i)},${y(fc.lo[fc.lo.length - 1 - i])}`).join("L")}Z" fill="var(--carbon)" opacity=".12"/>`;
+    `<path d="${path(fc.hi, hist.length)}L${fc.lo.map((v, i) => `${x(hist.length + fc.lo.length - 1 - i)},${y(fc.lo[fc.lo.length - 1 - i])}`).join("L")}Z" fill="var(--carbon)" opacity=".14"/>`;
   return svg(W, H, `Expected use over the last ${hist.length} days and the next ${fc.mean.length}`, `
     <line x1="${pad}" x2="${W}" y1="${H - pad}" y2="${H - pad}" stroke="var(--rule)"/>
-    <line x1="${x(hist.length - 0.5)}" x2="${x(hist.length - 0.5)}" y1="4" y2="${H - pad}" stroke="var(--rule)"/>
-    ${band}<path d="${path(hist, 0)}" fill="none" stroke="var(--ink)" stroke-width="1.5"/>
+    <line x1="${x(hist.length - 0.5)}" x2="${x(hist.length - 0.5)}" y1="4" y2="${H - pad}" stroke="var(--rule)" stroke-dasharray="2 3"/>
+    ${band}<path d="${path(hist, 0)}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
     <path d="${path(fc.mean, hist.length)}" fill="none" stroke="var(--carbon)" stroke-width="2" stroke-dasharray="5 3"/>
     <text x="${pad}" y="${H - 4}" font-size="10" fill="var(--muted)">last 30 days</text>
     <text x="${W}" y="${H - 4}" font-size="10" fill="var(--muted)" text-anchor="end">next ${fc.mean.length} days</text>`);
 }
 
+/* ---------- detail panel ---------- */
 function tree(c, p) {
   if (c.level === "DEMAND-SURGE")
     return `<p class="why">Diagnoses for the conditions this medicine treats jumped while deliveries kept arriving. This looks like a demand surge, not a supply failure.</p>`;
@@ -163,13 +249,15 @@ function facilityBlock(fa, p) {
   const b = fa.beds;
   const early = b.early_share_7d === null ? "" : ` ${pct(b.early_share_7d)} of last week's discharges were early.`;
   const truth = b.true_occupied === undefined ? "" : ` <strong>Ground truth:</strong> ${b.true_occupied} occupied.`;
+  const beds = Array.from({ length: Math.min(b.capacity, 40) }, (_, i) => `<i class="${i < b.occupied ? "on" : ""}"></i>`).join("");
   const rows = fa.staff.map((r) => `<tr><th scope="row">${CADRE[r.cadre]}</th><td>${r.in_position} of ${r.sanctioned}</td>
     <td>${r.in_position ? (r.marked_present ? "Present" : "Absent") : "n/a"}</td><td>${atWork(r)}</td>
     ${r.true_present === undefined ? "" : `<td>${r.true_present ? "At work" : "Away"}</td>`}</tr>`).join("");
-  return `<h3>${p.phc} today</h3>
+  return `<section><h3>${p.phc} today</h3>
+    <div class="beds" aria-hidden="true">${beds}</div>
     <p class="why">Beds: <strong>${b.occupied} of ${b.capacity}</strong> occupied, counted from admissions and recorded discharges${b.pressure ? ". Every bed is taken" : ""}.${early}${truth}</p>
-    <table class="data staff"><thead><tr><th scope="col">Staff</th><th scope="col">In post</th><th scope="col">Attendance</th><th scope="col">At work, from care records</th>${fa.staff[0].true_present === undefined ? "" : `<th scope="col">Ground truth</th>`}</tr></thead><tbody>${rows}</tbody></table>
-    <p class="note">Staff are shown by role only. No individuals and no location tracking.</p>`;
+    <div class="scroll"><table class="data staff"><thead><tr><th scope="col">Staff</th><th scope="col">In post</th><th scope="col">Attendance</th><th scope="col">At work, from care records</th>${fa.staff[0].true_present === undefined ? "" : `<th scope="col">Ground truth</th>`}</tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">Staff are shown by role only. No individuals and no location tracking.</p></section>`;
 }
 
 async function renderDetail() {
@@ -183,31 +271,44 @@ async function renderDetail() {
   const sum = (k) => s[k].slice(-14).reduce((a, b) => a + b, 0);
   const sure = Math.min(99, Math.round(100 * Math.max(...c.p)));   // never claim certainty
   const truth = c.true === undefined ? "" :
-    `<p class="why"><strong>Ground truth:</strong> ${fmt(c.true)} ${unit} on the shelf (${c.true_cover} days of use).</p>`;
-  const alarm = !c.alarm ? `<p class="why">No alarm. Care at this PHC matches what the diagnoses call for.</p>` : `
-    <p class="why">Alarm since day ${c.onset}. ${c.level === "LOCAL" ? "Only this PHC is affected so far." : c.level === "DEMAND-SURGE" ? "" : "Other PHCs went short on the same medicine in the same weeks."}</p>
+    `<p class="truthline"><strong>Ground truth:</strong> ${fmt(c.true)} ${unit} on the shelf (${c.true_cover} days of use).</p>`;
+  const alarm = !c.alarm ? `<h3>No alarm</h3><p class="why">Care at this PHC matches what the diagnoses call for.</p>` : `
+    <h3>Alarm since day ${c.onset}</h3>
+    ${c.level === "LOCAL" ? `<p class="why">Only this PHC is affected so far.</p>` : c.level === "DEMAND-SURGE" ? "" : `<p class="why">Other PHCs went short on the same medicine in the same weeks.</p>`}
     ${tree(c, p)}
     <p class="action ${["LOCAL", "WAREHOUSE", "DEMAND-SURGE"].includes(c.level) ? "local" : ""}"><strong>Suggested next step:</strong> ${esc(state.meta.actions[c.level])}. Treat where it broke as a first guess to check, not a verdict.</p>`;
   const asked = c.confirmed ? `<p class="done">The pharmacist said: ${c.confirmed === "empty" ? "it's finished" : "we have it"}.</p>` : "";
-  $("#detail").innerHTML = `
+  const panel = $("#detail");
+  if (state.fresh) {
+    panel.classList.remove("enter");
+    void panel.offsetWidth;   // restart the entrance animation
+    panel.classList.add("enter");
+    panel.scrollTop = 0;
+  } else panel.classList.remove("enter");
+  state.fresh = false;
+  panel.innerHTML = `
     <h2>${drugName(j)}</h2>
     <p class="where">${p.phc}, ${p.wh}, ${p.st}, day ${t}</p>
     <div class="versus">
       <div class="reg"><small>Register says</small><span class="ledger big${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unit}, about ${c.cover} days of use</small></div>
-      <div class="shelf ${cls}"><small>Shelf, inferred from care</small><span class="big state-${cls}">${word}</span><small>${sure}% sure</small></div>
+      <div class="shelf is-${cls}"><small>Shelf, inferred from care</small><span class="big">${word}</span><span class="meter" aria-hidden="true"><i style="width:${sure}%"></i></span><small>${sure}% sure</small></div>
     </div>
     ${truth}
-    <p class="why">In the last 14 days the diagnoses here called for about ${fmt(sum("N"))} courses.
-      ${fmt(sum("full"))} were given in full, ${fmt(sum("ration"))} were cut short, ${fmt(sum("sub"))} were switched to a guideline substitute and ${fmt(sum("na"))} were marked not available.</p>
-    ${chart(s)}
-    <div class="chart-key" aria-hidden="true">
-      <span><i class="sw ok"></i>Full course</span><span><i class="sw scarce"></i>Cut short</span>
-      <span><i class="sw" style="background:var(--sub)"></i>Substitute</span><span><i class="sw out"></i>Not available</span>
-      <span>- - - courses the diagnoses called for</span>
-    </div>
-    ${alarm}
-    <div class="confirm">
-      <p><strong>Ask the pharmacist</strong> to check the shelf. Their answer updates the estimate.</p>
+    <section>
+      <h3>What the care shows</h3>
+      <p class="why">In the last 14 days the diagnoses here called for about ${fmt(sum("N"))} courses.
+        ${fmt(sum("full"))} were given in full, ${fmt(sum("ration"))} were cut short, ${fmt(sum("sub"))} were switched to a guideline substitute and ${fmt(sum("na"))} were marked not available.</p>
+      ${chart(s)}
+      <p class="chart-key" aria-hidden="true">
+        <span><i class="sw" style="background:var(--ok)"></i>Full course</span><span><i class="sw scarce"></i>Cut short</span>
+        <span><i class="sw sub"></i>Substitute</span><span><i class="sw out"></i>Not available</span>
+        <span><i class="dash"></i>Courses the diagnoses called for</span>
+      </p>
+    </section>
+    <section>${alarm}</section>
+    <section class="confirm">
+      <h3>Ask the pharmacist</h3>
+      <p class="why">Ask them to check the shelf. Their answer updates the estimate.</p>
       ${asked}
       <div class="buttons">
         <button type="button" class="yes" data-answer="empty">Yes, it's finished<span class="or" lang="or">ହଁ, ସରିଯାଇଛି</span></button>
@@ -215,13 +316,15 @@ async function renderDetail() {
         <button type="button" class="rec" aria-pressed="false">Record the answer<span class="or">Any language</span></button>
       </div>
       <p id="confirmMsg" role="status"></p>
-    </div>
-    <h3>Next ${fc.days.length} days</h3>
-    <p class="why">The diagnoses point to about <strong>${fmt(fc.total)}</strong> ${unit} of use. Dispensing history, with the stock-out days filled in, suggests about ${fmt(fc.consumption_total)}.</p>
-    ${forecastChart(s, fc)}
+    </section>
+    <section>
+      <h3>Next ${fc.days.length} days</h3>
+      <p class="why">The diagnoses point to about <strong>${fmt(fc.total)}</strong> ${unit} of use. Dispensing history, with the stock-out days filled in, suggests about ${fmt(fc.consumption_total)}.</p>
+      ${forecastChart(s, fc)}
+    </section>
     ${facilityBlock(fa, p)}`;
-  $("#detail").querySelectorAll(".confirm button[data-answer]").forEach((b) => b.addEventListener("click", () => confirmShelf(b.dataset.answer)));
-  $("#detail .rec").addEventListener("click", (e) => recordAnswer(e.currentTarget));
+  panel.querySelectorAll(".confirm button[data-answer]").forEach((b) => b.addEventListener("click", () => confirmShelf(b.dataset.answer)));
+  panel.querySelector(".rec").addEventListener("click", (e) => recordAnswer(e.currentTarget));
 }
 
 function refreshAfterAnswer() {
@@ -277,13 +380,18 @@ async function recordAnswer(btn) {
   say("Recording. Ask whether the medicine is finished, then press Stop and send.");
 }
 
+/* ---------- lower sections ---------- */
 function renderMoves(plan) {
   const sel = state.sel && state.meta.facilities[state.sel.f].id;
   const moves = [...plan.transfers].sort((a, b) => (b.to_fac === sel || b.from_fac === sel) - (a.to_fac === sel || a.from_fac === sel) || b.courses - a.courses);
-  const where = (id) => { const p = place(facOf(id)); return `${p.phc}, ${p.wh}`; };
+  const end = (id) => { const p = place(facOf(id)); return `<span class="end">${p.phc}<small>${p.wh}</small></span>`; };
   const shown = moves.slice(0, 8).map((m) => {
     const j = drugOf(m.drug), mine = m.to_fac === sel || m.from_fac === sel;
-    return `<li class="${mine ? "mine" : ""}">Send <strong>${m.courses} courses</strong> (${fmt(m.units)} ${unitOf(j)}) of ${drugName(j)} from ${where(m.from_fac)} to ${where(m.to_fac)} in ${place(facOf(m.to_fac)).st}, ${m.minutes} minutes by road.</li>`;
+    return `<li class="move${mine ? " mine" : ""}">
+      <span class="qty"><span class="vh">Send</span><b>${m.courses}</b> courses<small>${fmt(m.units)} ${unitOf(j)}</small></span>
+      <span class="med">${drugName(j)}</span>
+      <span class="route"><span class="vh">from</span>${end(m.from_fac)}<span class="road">${m.minutes} min by road</span><span class="vh">to</span>${end(m.to_fac)}</span>
+      <span class="st">${place(facOf(m.to_fac)).st}</span></li>`;
   }).join("");
   const more = moves.length > 8 ? `<p class="note">And ${moves.length - 8} smaller transfers. Each goes out as a DVDMS-style issue order.</p>` : "";
   const groups = {};
@@ -292,69 +400,86 @@ function renderMoves(plan) {
     groups[k] = (groups[k] || 0) + 1;
   }
   const escRows = Object.entries(groups).map(([k, n]) => {
-    const [drug, level, st] = k.split("|");
-    return `<li>${drugName(drugOf(drug))} in ${stateName(st)}: ${n} ${n === 1 ? "PHC" : "PHCs"} short, looks like a ${level === "NATIONAL" ? "national shortage" : "state procurement gap"}. ${esc(state.meta.actions[level])}.</li>`;
+    const [drug, level, st] = k.split("|"), nat = level === "NATIONAL";
+    return `<li><span class="tag${nat ? " nat" : ""}">${nat ? "Likely national shortage" : "Likely state procurement gap"}</span>
+      <span><strong>${drugName(drugOf(drug))}</strong> in ${stateName(st)}: ${n} ${n === 1 ? "PHC" : "PHCs"} short. ${esc(cap(state.meta.actions[level]))}.</span></li>`;
   }).join("");
-  $("#moves").innerHTML = (shown ? `<ul class="plain">${shown}</ul>${more}` : `<p class="note">Nothing to move today. No PHC in a local shortage has a calm neighbour with stock to spare.</p>`)
-    + (escRows ? `<h3>Escalate instead of moving stock</h3><ul class="plain">${escRows}</ul>` : "");
+  $("#moves").innerHTML = (shown ? `<ul class="moves">${shown}</ul>${more}` : `<p class="note">Nothing to move today. No PHC in a local shortage has a calm neighbour with stock to spare.</p>`)
+    + (escRows ? `<h3>Escalate instead of moving stock</h3><ul class="plain esc">${escRows}</ul>` : "");
 }
 
 function renderNational(n) {
   const rows = n.exports.map((ex) => {
     const tot = (k) => ex.rows.reduce((a, r) => a + r[k], 0);
-    return `<tr><th scope="row">${stateName(ex.state)}</th><td>${fmt(tot("OK"))}</td><td>${fmt(tot("SCARCE"))}</td><td>${fmt(tot("OUT"))}</td>
-      <td>${fmt(n.raw_rows[ex.state])} records</td><td>${(n.export_bytes[ex.state] / 1024).toFixed(1)} KB of counts</td></tr>`;
+    const [ok, sc, out] = [tot("OK"), tot("SCARCE"), tot("OUT")];
+    const seg = (v, cls) => (v ? `<i class="${cls}" style="flex-grow:${v}"></i>` : "");
+    return `<tr><th scope="row">${stateName(ex.state)}</th>
+      <td><span class="comp" aria-hidden="true">${seg(ok, "ok")}${seg(sc, "scarce")}${seg(out, "out")}</span></td>
+      <td class="num">${fmt(ok)}</td><td class="num">${fmt(sc)}</td><td class="num">${fmt(out)}</td>
+      <td class="num">${fmt(n.raw_rows[ex.state])} records</td><td class="num">${(n.export_bytes[ex.state] / 1024).toFixed(1)} KB of counts</td></tr>`;
   }).join("");
   const flags = Object.entries(n.view).flatMap(([drug, v]) => {
     const j = drugOf(drug), out = [];
-    if (v.national) out.push(`<li>${drugName(j)}: short in several districts across states. Possible national supply failure. This flag is experimental and missed every national failure in testing.</li>`);
-    if (v.surge) out.push(`<li>${drugName(j)}: demand is surging across states. Raise indents.</li>`);
+    if (v.national) out.push(`<li><strong>${drugName(j)}</strong>: short in several districts across states. Possible national supply failure. This flag is experimental and missed every national failure in testing.</li>`);
+    if (v.surge) out.push(`<li><strong>${drugName(j)}</strong>: demand is surging across states. Raise indents.</li>`);
     return out;
   }).join("");
   const priors = Object.entries(n.priors).map(([drug, p]) =>
-    `<tr><th scope="row">${drugName(drugOf(drug))}</th><td>${pct(p.rho)}</td><td>${pct(p.tau)}</td></tr>`).join("");
-  $("#national").innerHTML = `<div class="proof-wrap"><table class="data"><thead><tr><th scope="col">State</th><th scope="col">PHC medicines stocked</th><th scope="col">Running short</th><th scope="col">Empty</th><th scope="col">Kept inside the state</th><th scope="col">Sent to the national view</th></tr></thead><tbody>${rows}</tbody></table></div>
+    `<tr><th scope="row">${drugName(drugOf(drug))}</th><td class="num">${pct(p.rho)}</td><td class="num">${pct(p.tau)}</td></tr>`).join("");
+  $("#national").innerHTML = `<div class="scroll"><table class="data"><thead><tr><th scope="col">State</th><th scope="col">Share of PHC medicines</th><th scope="col" class="num">Stocked</th><th scope="col" class="num">Running short</th><th scope="col" class="num">Empty</th><th scope="col" class="num">Kept inside the state</th><th scope="col" class="num">Sent to the national view</th></tr></thead><tbody>${rows}</tbody></table></div>
     <h3>Patterns across states</h3>${flags ? `<ul class="plain">${flags}</ul>` : `<p class="note">No medicine shows a cross-state pattern today.</p>`}
     <details><summary>What states get back</summary>
       <p class="note">National medians a new state can start from instead of waiting a month: how closely prescribing follows the rulebook, and how far registers can be trusted. In testing this made little difference to detection.</p>
-      <div class="proof-wrap"><table class="data"><thead><tr><th scope="col">Medicine</th><th scope="col">Prescribing follows the rulebook</th><th scope="col">Register trust</th></tr></thead><tbody>${priors}</tbody></table></div>
+      <div class="scroll"><table class="data"><thead><tr><th scope="col">Medicine</th><th scope="col" class="num">Prescribing follows the rulebook</th><th scope="col" class="num">Register trust</th></tr></thead><tbody>${priors}</tbody></table></div>
     </details>`;
 }
 
 function proof(m) {
   const days = (n) => `${n} ${n === 1 ? "day" : "days"}`;
   const lead = (d) => d === null || Number.isNaN(d) ? "n/a" : d > 0 ? `${days(d)} before` : d < 0 ? `${days(-d)} after` : "same day";
+  const meter = (v) => `<td class="pm"><span>${pct(v)}</span><i style="--v:${Math.round(100 * (v || 0))}%" aria-hidden="true"></i></td>`;
   const rows = [["Anumaan", m.model],
     [`The register, tuned to the same false-alarm budget (${m.register_best ? m.register_best.threshold : "?"} days)`, m.register_best],
     ["The register at 14 days, a common reorder level", m.register["14"]],
     ["Dispensing history only, no diagnoses", m.drug_only],
     ["Simple threshold on the same rulebook", m.crg_rule]].filter(([, r]) => r);
-  $("#proof").innerHTML = `<thead><tr><th scope="col">Method</th><th scope="col">Stock-outs of 4+ days caught</th><th scope="col">Warned before the shelf emptied</th><th scope="col">Typical warning</th><th scope="col">False alarms per medicine per year</th></tr></thead>
-    <tbody>${rows.map(([n, r]) => `<tr><th scope="row">${n}</th><td>${pct(r.recall_4d)}</td><td>${pct(r.early)}</td><td>${lead(r.median_lead)}</td><td>${r.false_per_series_year.toFixed(2)}</td></tr>`).join("")}</tbody>`;
+  $("#proof").innerHTML = `<thead><tr><th scope="col">Method</th><th scope="col">Stock-outs of 4+ days caught</th><th scope="col">Warned before the shelf emptied</th><th scope="col">Typical warning</th><th scope="col" class="num">False alarms per medicine per year</th></tr></thead>
+    <tbody>${rows.map(([n, r], k) => `<tr${k ? "" : ' class="lead"'}><th scope="row">${n}</th>${meter(r.recall_4d)}${meter(r.early)}<td>${lead(r.median_lead)}</td><td class="num">${r.false_per_series_year.toFixed(2)}</td></tr>`).join("")}</tbody>`;
   $("#triageNote").textContent = `Where it broke is still a first guess: right for ${pct(m.triage_7d.episodes)} of supply failures a week after the alarm, against ${pct(m.triage_majority)} for always guessing the commonest cause. Early warning depends on staff rationing before the shelf empties; without it, Anumaan still catches most outages, about two days after they start.`;
 }
 
 async function init() {
   state.meta = await get("/api/meta");
   $("#day").max = state.meta.days - 1;
+  $("#dayMax").textContent = state.meta.days - 1;
   $("#grammarNote").textContent = `Rulebook ${state.meta.grammar}: ${state.meta.grammar_note}`;
   buildGrid();
   proof(await get("/api/eval"));
   const s = state.meta.start;
   state.sel = { f: s.f, j: s.j };
+  state.fresh = true;
   await show(s.day);
+  setTimeout(() => document.body.classList.remove("intro"), 1800);
 }
 
 let pending;
-$("#day").addEventListener("input", (e) => { clearTimeout(pending); pending = setTimeout(() => show(+e.target.value), 60); });
+$("#day").addEventListener("input", (e) => {
+  const t = +e.target.value;
+  setDay(t);
+  clearTimeout(pending);
+  pending = setTimeout(() => show(t), 60);
+});
 $("#truth").addEventListener("change", (e) => { state.truth = e.target.checked; show(state.day); });
 $("#play").addEventListener("click", () => {
-  const b = $("#play");
-  if (state.timer) { clearInterval(state.timer); state.timer = null; b.textContent = "Play"; b.setAttribute("aria-pressed", "false"); return; }
-  b.textContent = "Pause"; b.setAttribute("aria-pressed", "true");
+  const b = $("#play"), label = b.querySelector("span");
+  if (state.timer) { clearInterval(state.timer); state.timer = null; label.textContent = "Play"; b.setAttribute("aria-pressed", "false"); return; }
+  label.textContent = "Pause"; b.setAttribute("aria-pressed", "true");
   state.timer = setInterval(() => {
     if (state.day >= state.meta.days - 1) return $("#play").click();
     show(state.day + 1);
   }, 700);
 });
-init().catch((e) => { $("#detail").innerHTML = `<p class="hint">The demo could not start: ${esc(e.message)}. Check that the server is running.</p>`; });
+init().catch((e) => {
+  document.body.classList.remove("intro");
+  $("#detail").innerHTML = `<p class="hint">The demo could not start: ${esc(e.message)}. Check that the server is running.</p>`;
+});

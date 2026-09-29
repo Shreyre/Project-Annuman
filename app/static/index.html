@@ -2,72 +2,93 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>Anumaan: the shelf behind the register</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23b8232b'/%3E%3Cpath d='M3 5h10M3 8h10M3 11h6' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23be2830'/%3E%3Cpath d='M3 5h10M3 8h10M3 11h6' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Kalam:wght@400&family=Noto+Sans+Oriya:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2">
+<link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Odia:wght@500;600&family=Kalam:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
-<body>
-<header class="top">
-  <div class="brand">
-    <h1>Anumaan</h1>
-    <p class="tagline">The register says it's on the shelf. The care says otherwise.</p>
-  </div>
-  <p class="synthetic" title="All facilities, patients and stock in this demo are simulated.">Synthetic data</p>
+<body class="intro">
+<header class="top shell">
+  <a class="brand" href="./" aria-label="Anumaan, home">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M7 11h18M7 16h18M7 21h11"/><path class="cut" d="M5 23 27 8"/></svg>
+    <span class="word">Anumaan</span>
+  </a>
+  <p class="tagline">The register says it's on the shelf. The care says otherwise.</p>
+  <p class="stamp" title="All facilities, patients and stock in this demo are simulated.">Synthetic data</p>
 </header>
 
-<section class="clock" aria-label="Replay controls">
-  <button id="play" type="button" aria-pressed="false">Play</button>
-  <label class="day-label" for="day">Day <output id="dayOut">0</output></label>
-  <input id="day" type="range" min="0" max="199" value="0">
-  <label class="truth"><input id="truth" type="checkbox"> Show ground truth</label>
+<section class="hero shell" aria-live="polite">
+  <p id="phantomLine" class="headline"></p>
 </section>
 
-<section class="headline" aria-live="polite">
-  <p id="phantomLine"></p>
+<section class="bar" aria-label="Replay controls">
+  <div class="bar-in shell">
+    <button id="play" class="play" type="button" aria-pressed="false">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path class="i-play" d="M6 4.5v11l9-5.5z"/><path class="i-pause" d="M5.5 4.5h3v11h-3zM11.5 4.5h3v11h-3z"/></svg>
+      <span>Play</span>
+    </button>
+    <label class="day" for="day"><span>Day</span> <output id="dayOut">0</output> <span class="of">of <span id="dayMax">199</span></span></label>
+    <input id="day" type="range" min="0" max="199" value="0">
+    <label class="switch"><input id="truth" type="checkbox" role="switch"><span class="track" aria-hidden="true"></span>Show ground truth</label>
+  </div>
 </section>
 
-<main class="layout">
-  <section class="network" aria-label="PHC network">
-    <div class="legend" aria-hidden="true">
-      <span><i class="sw ok"></i>Stocked</span>
-      <span><i class="sw scarce"></i>Running short</span>
-      <span><i class="sw out"></i>Empty</span>
-      <span><i class="sw out phantom"></i>Empty, register still shows stock</span>
+<main class="layout shell">
+  <section class="network" aria-labelledby="netTitle">
+    <div class="net-head">
+      <h2 id="netTitle">The network today</h2>
+      <ul class="legend" id="legend">
+        <li><i class="sw ok"></i>Stocked <b data-k="ok">0</b></li>
+        <li><i class="sw scarce"></i>Running short <b data-k="scarce">0</b></li>
+        <li><i class="sw out"></i>Empty <b data-k="out">0</b></li>
+        <li><i class="sw out phantom"></i>Empty, register still shows stock <b data-k="phantom">0</b></li>
+      </ul>
     </div>
-    <div class="grid-wrap"><table id="grid"></table></div>
+    <div id="grid" class="states"></div>
+    <p class="grid-hint">Select any square to see why Anumaan thinks what it thinks.</p>
   </section>
 
-  <aside class="detail" id="detail" aria-live="polite">
+  <aside class="detail" id="detail" aria-live="polite" tabindex="-1">
     <p class="hint">Select a PHC and medicine to see why Anumaan thinks what it thinks.</p>
   </aside>
 </main>
 
-<section class="band" aria-labelledby="movesTitle">
-  <h2 id="movesTitle">What to move today</h2>
-  <p class="proof-note">Planned in treatment courses from PHCs that have been calm all week, only within the same state and three hours by road. Where the shortage runs statewide or national, moving stock around cannot fix it, so it is escalated instead.</p>
-  <div id="moves"></div>
+<section class="rail shell" aria-labelledby="movesTitle">
+  <div class="rail-head">
+    <h2 id="movesTitle">What to move today</h2>
+    <p class="note">Planned in treatment courses from PHCs that have been calm all week, only within the same state and three hours by road. Where the shortage runs statewide or national, moving stock around cannot fix it, so it is escalated instead.</p>
+  </div>
+  <div id="moves" class="rail-body"></div>
 </section>
 
-<section class="band" aria-labelledby="natTitle">
-  <h2 id="natTitle">What the national view sees</h2>
-  <p class="proof-note">Each state keeps its own diagnoses and slips. Only counts per district and medicine cross the state line, and any group of fewer than five PHCs is suppressed.</p>
-  <div id="national"></div>
+<section class="rail shell" aria-labelledby="natTitle">
+  <div class="rail-head">
+    <h2 id="natTitle">What the national view sees</h2>
+    <p class="note">Each state keeps its own diagnoses and slips. Only counts per district and medicine cross the state line, and any group of fewer than five PHCs is suppressed.</p>
+  </div>
+  <div id="national" class="rail-body"></div>
 </section>
 
-<section class="proof" aria-labelledby="proofTitle">
-  <h2 id="proofTitle">How well it works</h2>
-  <p class="proof-note">Scored against the simulator's hidden ground truth. A catch is an alarm up to three weeks before the shelf empties.</p>
-  <div class="proof-wrap"><table id="proof"></table></div>
-  <p id="triageNote" class="proof-note"></p>
+<section class="rail shell" aria-labelledby="proofTitle">
+  <div class="rail-head">
+    <h2 id="proofTitle">How well it works</h2>
+    <p class="note">Scored against the simulator's hidden ground truth. A catch is an alarm up to three weeks before the shelf empties.</p>
+  </div>
+  <div class="rail-body">
+    <div class="scroll"><table id="proof" class="data proof"></table></div>
+    <p id="triageNote" class="note"></p>
+  </div>
 </section>
 
-<footer class="foot">
+<footer class="foot shell">
   <p id="grammarNote"></p>
 </footer>
-<script src="app.js?v=2"></script>
+
+<div id="tip" class="tip" aria-hidden="true" hidden></div>
+<script src="app.js?v=3"></script>
 </body>
 </html>
