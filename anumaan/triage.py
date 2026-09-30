@@ -4,8 +4,8 @@ Each district warehouse indents from the state every week (DVDMS records the
 indent and what arrived against it). When the state stops filling a warehouse's
 indents for a drug, the break is at or above that warehouse, even while its
 30-90 days of buffer still hide it from the PHCs. One warehouse starved is a
-WAREHOUSE failure; 2+ in a state is STATE-PROCUREMENT; 2+ in each of 2+ states is
-NATIONAL. If supply kept flowing, the alarm is a DEMAND-SURGE when the state's
+WAREHOUSE failure; a third of a state's warehouses (and at least 2) is STATE-PROCUREMENT;
+that in each of 2+ states is NATIONAL. If supply kept flowing, the alarm is a DEMAND-SURGE when the state's
 diagnoses for the drug run well above its warm-up (the fix is a bigger indent, not
 an audit), else LOCAL: something at the PHC itself.
 """
@@ -26,6 +26,15 @@ STARVED = 0.3     # a warehouse got under 30% of what it indented...
 LAG, WIN = 10, 28  # ...over the indents placed 10-38 days ago (receipts post up to 10 days late)
 LOOK = 7          # a warehouse starved up to a week before an alarm still explains it
 SURGE, SURGE_DAYS = 1.2, 7   # the state's expected courses over 7 days, 20%+ over its warm-up
+
+
+def wide(n_starved, n_warehouses):
+    """Has a state's own supply broken? At least 2 of its warehouses starved, and at least a
+    third of them. For the 3-warehouse states the constants above were tuned on this is the
+    same "2 or more". A lost ledger posting can starve a warehouse by chance, so with 14
+    warehouses "2 or more" called 116 ordinary stock-outs state or national on seeds 0-4
+    (accuracy 0.82); a third calls 18 (0.88) and misses 2 more real ones. A half misses 9 more."""
+    return n_starved >= max(2, -(-n_warehouses // 3))
 
 
 def fill_rate(asked, got, posted, lag=LAG, win=WIN):
@@ -60,16 +69,14 @@ def classify(onsets, wh, st, fill, lift, asof):
     """Label each alarm onset (fac, drug, day) from the ledger and diagnoses up to day asof
     (one day for all, or one per onset; at least the day after the onset, when an alarm is
     confirmed). wh / st: warehouse / state id per facility; fill: fill_rate, warehouses in
-    sorted order; lift: surge_lift.
-    ponytail: "2+ starved warehouses" assumes a state has 3 or so; use a share of them for
-    states with many districts."""
+    sorted order; lift: surge_lift."""
     whs = sorted(set(wh))
     w_of, st_of = [whs.index(w) for w in wh], [dict(zip(wh, st))[w] for w in whs]
-    last = len(fill) - 1
+    last, n_wh = len(fill) - 1, Counter(st_of)
     labels = []
     for (f, d, t), day in zip(onsets, np.broadcast_to(asof, (len(onsets),))):
         hit = np.nonzero(starved(fill, t - LOOK, min(day, last))[:, d])[0]
-        short = {s for s, n in Counter(st_of[w] for w in hit).items() if n >= 2}
+        short = {s for s, n in Counter(st_of[w] for w in hit).items() if wide(n, n_wh[s])}
         if len(short) >= 2:
             labels.append("NATIONAL")
         elif st[f] in short:

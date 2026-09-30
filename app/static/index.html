@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Odia:wght@500;600&family=Kalam:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body class="intro">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -39,6 +39,7 @@
   <nav class="tabs" aria-label="Main navigation">
     <a href="#overview" data-view="overview" aria-current="page">Overview</a>
     <a href="#transfers" data-view="transfers">Redistribution <span id="moveCount" class="count">…</span></a>
+    <a href="#care" data-view="care">Beds &amp; staff <span id="careCount" class="count">…</span></a>
     <a href="#national-view" data-view="national-view">National view</a>
     <a href="#validation" data-view="validation">Performance</a>
   </nav>
@@ -58,9 +59,13 @@
 
   <div class="page-heading">
     <div><h1 id="pageTitle">Network overview</h1><p id="pageDescription">The register says it’s on the shelf. The care says otherwise.</p></div>
-    <span id="networkSize" class="scope-label">Connecting to the network…</span>
+    <div class="scope">
+      <div id="netSwitch" class="segmented" role="group" aria-label="Network"><button type="button" data-net="demo" aria-pressed="true">Demo network</button><button type="button" data-net="kerala" aria-pressed="false">Kerala replay</button><button type="button" data-net="live" aria-pressed="false">Live feed</button></div>
+      <span id="networkSize" class="scope-label">Connecting to the network…</span>
+    </div>
   </div>
   <div id="loadError" class="error-banner" role="alert" hidden><span></span><button id="retry" class="button" type="button">Try again</button></div>
+  <div id="context" class="context" hidden></div>
 
   <section id="overview" class="view" aria-label="Network overview">
     <div class="metrics" id="legend" role="group" aria-label="Medicine availability. Select one to filter the list.">
@@ -104,6 +109,11 @@
     <p class="section-note">Donors must have been calm all week and within three hours by road. State and national shortages are escalated instead, because moving stock cannot fix them. Nothing moves until an officer approves it.</p>
     <div id="moves" class="rail-body"></div>
   </section>
+  <section id="care" class="view panel rail" hidden aria-labelledby="careTitle">
+    <div class="panel-heading"><div><h2 id="careTitle">Beds and staff today</h2><p>Counted from admissions, discharges and attendance, then checked against the care record.</p></div><span class="tag">By role only</span></div>
+    <p class="section-note">The bed count closes a stay with no recorded discharge after five days. An attendance mark is questioned only on a busy day with none of that role’s work in the care record. No individuals and no location tracking.</p>
+    <div id="careBoard" class="rail-body"></div>
+  </section>
   <section id="national-view" class="view panel rail" hidden aria-labelledby="natTitle">
     <div class="panel-heading"><div><h2 id="natTitle">What the national view sees</h2><p>Supply patterns across state lines, without moving any care record.</p></div><span class="tag">Counts only</span></div>
     <p class="section-note">Diagnoses and slips stay inside each state. Only district and medicine counts are shared, and any group of fewer than five PHCs is suppressed.</p>
@@ -112,7 +122,8 @@
   <section id="validation" class="view panel rail" hidden aria-labelledby="proofTitle">
     <div class="panel-heading"><div><h2 id="proofTitle">How well it works</h2><p>Anumaan against the register and dispensing baselines.</p></div><span class="tag">Synthetic evaluation</span></div>
     <p class="section-note">Scored against the simulator’s hidden ground truth on a held-out seed. A catch is an alarm up to three weeks before the shelf empties. Not yet validated on real patient data.</p>
-    <div class="rail-body"><div class="scroll"><table id="proof" class="data proof"></table></div><p id="triageNote" class="note"></p></div>
+    <div class="rail-body"><div class="scroll"><table id="proof" class="data proof"></table></div><p id="dayNote" class="note"></p><p id="triageNote" class="note"></p>
+      <div id="real" hidden><h3>A first check on real data</h3><div id="realBody"></div></div></div>
   </section>
 
   <footer class="foot"><span class="footer-brand">Anumaan is a synthetic replay, not a live clinical or inventory system.</span><p id="grammarNote"></p></footer>
@@ -131,6 +142,6 @@
   <button id="startExploring" class="button primary" type="button">Explore the network</button>
 </dialog>
 <div id="tip" class="tip" aria-hidden="true" hidden></div><div id="toast" class="toast" role="status" hidden></div>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 """Score Anumaan against injected ground truth on SYNTHETIC data.
 
-    python -m anumaan.evaluate --seeds 5-9 --behaviour alt [--ration 0]
+    python -m anumaan.evaluate --seeds 5-9 --behaviour alt [--ration 0] [--fill 0.05 0.3]
 
 Every comparison sees only what a real deployment would see:
   care_only     the filter alone, without the shadow-stock alarm
@@ -10,6 +10,12 @@ Every comparison sees only what a real deployment would see:
   crg_rule      the same CRG decoding (7-day full-course share) with a tuned threshold, no filter
   drug_only     the filter and shadow stock without diagnoses: each drug against its own warm-up dispensing
 Filter, shadow, triage and crg_rule thresholds were tuned on seeds 0-4; report seeds 5-9.
+
+--fill makes the world shorter of stock, nearer what surveys of Indian PHCs report: the share
+of each routine indent the warehouse sends (default 0.5-1.0, shelves stocked 98-99% of days;
+0.05-0.3 gives about 70%). Alarms are then live most of the time, so "caught" says little;
+the day-by-day line is the one to read. The world still starts with full shelves, so the
+month the filter learns from is clean: a PHC already short in that month is not tested here.
 """
 import argparse
 from collections import Counter
@@ -19,6 +25,7 @@ import numpy as np
 from anumaan import crg as G, filter as FL, sim, triage
 
 EARLY = 21   # an alarm live from 3 weeks before the shelf empties until it refills is a detection
+WARMUP = 30  # the filter's learning window: the day-by-day scores start after it
 
 
 def _hits(alarm_map, e):
@@ -61,6 +68,7 @@ def evaluate(run):
     expected = obs["N"][:, :, P].sum(2)
     methods = {k: {} for k in ("model", "care_only", "drug_only", "crg_rule", "receipt_gap")}
     cover, scarce = {}, {}
+    empty = {k: np.zeros(3) for k in ("model", "register")}    # days it said empty and was, said empty, was empty
     for f in range(F):
         skip = FL.entry_gaps(given[:, f], expected[:, f])
         for d in P:
@@ -82,10 +90,16 @@ def evaluate(run):
             last = np.maximum.accumulate(np.where(got, np.arange(days), 0))
             methods["receipt_gap"][(f, d)] = FL.segments(np.arange(days) - last > 33)
             cover[(f, d)] = book / np.maximum(FL.trailing_mean(obs["exp_units"][:, f, d]), 1e-9)
+            out = (run.true_stock[:, f, d] < 0.5 * run.true_use[:, f, d])[WARMUP:]      # GROUND TRUTH: the shelf is empty
+            for name, said in (("model", post[WARMUP:, 2] >= 0.5), ("register", cover[(f, d)][WARMUP:] < 0.5)):
+                empty[name] += (said & out).sum(), said.sum(), out.sum()
             scarce[(f, d)] = run.true_stock[:, f, d] < max(7, run.ration_cover[f]) * run.true_use[:, f, d]
 
     res = dict(events=len(events), types=Counter(e["type"] for e in events),
                availability=float(1 - (run.true_stock[:, :, P] < 0.5 * run.true_use[:, :, P]).mean()),
+               # day by day after the warm-up: of the days a shelf was empty, the share each source called empty
+               # (found); of the days it called empty, the share that were (right)
+               empty_days={k: dict(found=float(a / max(n, 1)), right=float(a / max(b, 1))) for k, (a, b, n) in empty.items()},
                **{k: _score(m, events, scarce, days) for k, m in methods.items()})
     sweep = {k: _score({key: FL.segments(c < k) for key, c in cover.items()}, events, scarce, days) for k in range(1, 31)}
     res["register"] = {k: sweep[k] for k in (3, 7, 14, 21)}
@@ -132,13 +146,16 @@ def main():
     ap.add_argument("--seeds", default="5-9", help="held-out seeds, e.g. 5-9 or 0,3")
     ap.add_argument("--behaviour", default="default", choices=sorted(sim.BEHAVIOUR))
     ap.add_argument("--ration", type=float, default=None, help="force the rationing probability (0 = staff never ration)")
+    ap.add_argument("--fill", type=float, nargs=2, default=(0.5, 1.0), metavar=("LO", "HI"),
+                    help="share of each routine indent the warehouse sends; 0.05 0.3 empties shelves about 30%% of days")
     a = ap.parse_args()
     seeds = (list(range(int(a.seeds.split("-")[0]), int(a.seeds.split("-")[1]) + 1)) if "-" in a.seeds
              else [int(s) for s in a.seeds.split(",")])
-    rs = [evaluate(sim.simulate(seed=s, behaviour=a.behaviour, p_ration=a.ration)) for s in seeds]
+    rs = [evaluate(sim.simulate(seed=s, behaviour=a.behaviour, p_ration=a.ration, fill=tuple(a.fill))) for s in seeds]
 
     print(f"SYNTHETIC evaluation - seeds {a.seeds}, behaviour '{a.behaviour}'"
-          + (f", rationing forced to {a.ration}" if a.ration is not None else ""))
+          + (f", rationing forced to {a.ration}" if a.ration is not None else "")
+          + (f", routine indents filled {a.fill[0]:g}-{a.fill[1]:g}" if tuple(a.fill) != (0.5, 1.0) else ""))
     print(f"  {_range([r['events'] for r in rs], '{:.0f}')} true stock-outs per run; shelf availability "
           f"{_range([r['availability'] for r in rs])}; mix {dict(sum((r['types'] for r in rs), Counter()))}")
     print(f"\n{'':16}{'detected':>10}{'4+ day outs':>13}{'warned early':>14}{'median lead (d)':>17}{'false alarms/series-yr':>24}")
@@ -152,6 +169,10 @@ def main():
               f"{_range([m['median_lead'] for m in ms], '{:+.1f}'):>17}{_range([m['false_per_series_year'] for m in ms]):>24}")
     print(f"  ('register best' = the register threshold ({_range([r['register_best']['threshold'] for r in rs if r['register_best']], '{:.0f}')} days)"
           f" with the most catches at the model's false-alarm rate)")
+    day = lambda who, key: _range([r["empty_days"][who][key] for r in rs])
+    print(f"\nday by day after the {WARMUP}-day warm-up, on the days a shelf was empty: anumaan says empty on "
+          f"{day('model', 'found')} of them and is right {day('model', 'right')} of the times it says so;\n"
+          f"  the register (under half a day of use on the books) {day('register', 'found')} and {day('register', 'right')}")
     print("\nrecall by cause (anumaan): " + ", ".join(
         f"{k} {_range([r['model']['by_type'][k] for r in rs if k in r['model']['by_type']])}" for k in sim.TYPES))
     for settle in (7, 21):

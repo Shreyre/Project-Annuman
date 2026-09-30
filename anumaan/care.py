@@ -37,6 +37,7 @@ VERIFY = 0.1          # marked present but P(present | acts) below this on a bus
 BUSY = 3              # a busy day: at least this many cadre acts expected had the cadre been in
 # VERIFY and BUSY were chosen on seeds 0-4; report seeds 5-9
 WARMUP = 30
+AUDIT_MIN = 20        # a PHC's marking habit is not rated on fewer days than this with a cadre evidently away
 
 
 @dataclass
@@ -112,10 +113,10 @@ def census(care, auto_close=AUTO_CLOSE):
     discharges, any stay still open after auto_close days closed (None: the naive count)."""
     T = care.marked.shape[0]
     n = np.zeros((T + 1, len(care.facilities)))
-    out = {s: t for t, _, s, _ in care.discharges}
+    out = {(f, s): t for t, f, s, _ in care.discharges}      # a stay id is only unique within its PHC
     for t, f, s, _ in care.admits:
         n[t, f] += 1
-        n[min(out.get(s, T), t + auto_close if auto_close else T), f] -= 1
+        n[min(out.get((f, s), T), t + auto_close if auto_close else T), f] -= 1
     return n.cumsum(0)[:T]
 
 
@@ -175,6 +176,17 @@ def staff(care, warmup=WARMUP, iters=50):
     return dict(p_present=p, expected=expected, verify=care.marked & (p < VERIFY) & (expected >= BUSY))
 
 
+def proxy_marking(care, lo=WARMUP, hi=None, s=None):
+    """Each PHC's habit of marking absent staff present, from the feeds alone. Over days
+    [lo, hi): (n, k), each [fac]. n: cadre-days on which the care record shows the cadre away
+    (a busy day with P(present | acts) under VERIFY); k: how many of those the attendance feed
+    marked present. k / n estimates the PHC's proxy-marking rate. The four cadres are pooled,
+    because the habit is the facility's; nothing here is tuned. s: staff(care) if already computed."""
+    s = s or staff(care)
+    away = (s["p_present"] < VERIFY) & (s["expected"] >= BUSY) & (care.in_position > 0)
+    return away[lo:hi].sum((0, 2)), (away & care.marked)[lo:hi].sum((0, 2))
+
+
 def staff_view(care, t):
     s = staff(care)
     return [dict(fac=fid, cadre=k, sanctioned=int(SANCTIONED[j]), in_position=int(care.in_position[f, j]),
@@ -201,7 +213,15 @@ def evaluate_care(care):
     # fair baseline, no model: usual acts per patient from the warm-up x today's patients (0.3 not tuned)
     e = care.exposure * care.acts[:WARMUP].sum(0) / np.maximum(care.exposure[:WARMUP].sum(0), 1)
     ratio = care.marked & (e >= BUSY) & (care.acts <= 0.3 * e)
-    return dict(mae_naive=float(np.abs(naive - occ).mean()), mae_auto=float(np.abs(b["occupied"] - occ).mean()),
+    # each PHC's proxy-marking rate against the truth: does the estimate put the PHCs in the right order?
+    rate = lambda n, k: k / np.maximum(n, 1)
+    habit = rate(absent[WARMUP:].sum((0, 2)), ghost[WARMUP:].sum((0, 2)))
+    order = lambda x: float(np.corrcoef(np.argsort(np.argsort(x)), np.argsort(np.argsort(habit)))[0, 1])
+    away_r = (e >= BUSY) & (care.acts <= 0.3 * e) & (care.in_position > 0)
+    est = rate(*proxy_marking(care))
+    audit = dict(rank=order(est), mae=float(np.abs(est - habit).mean()), rank_feed=order(care.marked[WARMUP:].mean((0, 2))),
+                 rank_ratio=order(rate(away_r[WARMUP:].sum((0, 2)), (away_r & care.marked)[WARMUP:].sum((0, 2)))))
+    return dict(audit=audit, mae_naive=float(np.abs(naive - occ).mean()), mae_auto=float(np.abs(b["occupied"] - occ).mean()),
                 full_rate=float(full.mean()), full_naive=_pr(naive >= care.capacity, full),
                 full_auto=_pr(b["pressure"], full),
                 absences=int(absent.sum()), feed_missed=float(ghost.sum() / max(absent.sum(), 1)),
@@ -233,6 +253,10 @@ def main():
     print("        by cadre: " + ", ".join(
         f"{k} {_range([r['ghost_by_cadre'][k]['precision'] for r in rs])} / {_range([r['ghost_by_cadre'][k]['recall'] for r in rs])}"
         for k in CADRES))
+    au = lambda key: _range([r["audit"][key] for r in rs])
+    print("      which PHCs mark absent staff present: each PHC's share of evident absences marked present, against its\n"
+          f"      true proxy-marking rate. Rank correlation over the PHCs {au('rank')} (off by {_range([r['audit']['mae'] for r in rs], '{:.3f}')} on average);\n"
+          f"      the no-model ratio rule {au('rank_ratio')}; the attendance feed alone (share of days marked present) {au('rank_feed')}")
 
 
 if __name__ == "__main__":

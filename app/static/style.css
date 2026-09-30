@@ -215,6 +215,17 @@ main:focus { outline: none; }
 h1 { font-size: 1.875rem; line-height: 1.15; font-weight: 680; font-stretch: 104%; letter-spacing: -.022em; }
 #pageDescription { margin-top: 6px; color: var(--muted); font-size: 1rem; }
 .scope-label { color: var(--muted); font-size: .875rem; white-space: nowrap; }
+.scope { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; }
+/* what is different about the network on screen: a scenario's script, or the live feed's progress */
+.context {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; margin-bottom: 16px; padding: 14px 16px;
+  background: var(--carbon-soft); border-radius: var(--r-l); font-size: .875rem; line-height: 1.55;
+}
+.context p { max-width: 90ch; margin-top: 4px; }
+.context a { color: var(--carbon); }
+.context .button { flex: none; }
+.quiet { color: var(--muted); }
+.feed-log { margin: 8px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: .8125rem; }
 
 /* status strip: counts that double as filters */
 .metrics {
@@ -402,6 +413,7 @@ table.grid { width: 100%; border-collapse: separate; border-spacing: 3px; font-s
 .buttons .rec[aria-pressed="true"] { background: var(--out-soft); border-color: var(--out); color: var(--out-text); }
 #confirmMsg { margin-top: 10px; font-size: .875rem; }
 #confirmMsg:empty { display: none; }
+.brief-ask { display: flex; flex-wrap: wrap; gap: 8px; }     /* the language list and its button stack on a narrow panel */
 .done { color: var(--ok); font-weight: 650; }
 .flag { color: var(--out-text); font-weight: 650; }
 .beds { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 4px; }
@@ -447,9 +459,23 @@ table.grid { width: 100%; border-collapse: separate; border-spacing: 3px; font-s
 .data.staff th, .data.staff td { padding: 8px 10px 8px 0; vertical-align: top; }
 .data.staff th:last-child, .data.staff td:last-child { padding-right: 0; }
 .data.staff tbody th small { display: block; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 12px; background: var(--rule); border: 1px solid var(--rule); border-radius: var(--r-m); overflow: hidden; }
+.stat { display: flex; flex-direction: column; padding: 12px 16px 14px; background: var(--surface); }
+.stat strong { font-size: 1.75rem; line-height: 1.15; font-weight: 680; font-stretch: 88%; }
+.stat span { font-size: .875rem; font-weight: 600; }
+.stat small { color: var(--muted); font-size: .8125rem; }
+.esc em { color: var(--muted); font-style: normal; }
+.board { min-width: 720px; font-size: .875rem; }
+.board th small, .board td small { display: block; color: var(--muted); font-weight: 400; }
+.board .wh { vertical-align: top; }
+.board .beds { margin: 0 0 2px; }
 .comp { display: flex; gap: 2px; width: 9rem; height: 8px; }
 .comp i { min-width: 3px; border-radius: 3px; }
 .proof { min-width: 760px; }
+.real { min-width: 820px; margin-top: 8px; font-size: .875rem; }
+.real td small { display: block; color: var(--muted); }
+.real .chart { display: block; width: 240px; }
+#real a { color: var(--carbon); }
 .proof tr.lead > * { background: var(--carbon-soft); }
 .proof tr.lead th { padding-left: 12px; border-radius: var(--r-m) 0 0 var(--r-m); }
 .proof tr.lead > * { border-bottom-color: transparent; }
@@ -522,6 +548,11 @@ dialog .primary { width: 100%; min-height: 44px; margin-top: 20px; }
   h1 { font-size: 1.5rem; }
   .scope-label { display: none; }
   .metrics { grid-template-columns: 1fr 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .scope { justify-content: flex-start; width: 100%; }
+  #netSwitch { width: 100%; }
+  #netSwitch button { flex: 1 1 0; min-width: 0; padding: 5px 6px; line-height: 1.2; }
+  .context { flex-direction: column; }
   .metric { padding: 12px 14px 14px; }
   .metric strong { font-size: 1.875rem; }
   .insight { flex-wrap: wrap; }

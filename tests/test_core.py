@@ -57,3 +57,13 @@ def test_beats_the_register_on_a_held_out_network():
     r = evaluate(sim.simulate(seed=5, p_ration=0.0))
     assert r["care_only"]["early"] < 0.15 and r["model"]["early"] >= 0.45
     assert r["model"]["false_per_series_year"] <= 0.15
+
+
+def test_a_scripted_scenario_injects_its_failures_and_no_others():
+    script = [dict(type="STATE-PROCUREMENT", root="S0", drug="amoxicillin_500", start=21, dur=28, short=0.0)]
+    run = sim.simulate(seed=3, days=70, n_states=1, n_wh=4, n_phc=2, episodes=script)
+    assert {(e["type"], e["root"], e["start"], e["end"]) for e in run.episodes} == {("STATE-PROCUREMENT", "S0", 21, 49)}
+    d = run.ix["di"]["amoxicillin_500"]
+    assert not run.wh_got[21:49, :, d].any() and run.wh_asked[21:49, :, d].any()      # the state fills none of its indents
+    assert run.wh_got[:21, :, d].any() and run.wh_got[49:, :, d].any()
+    assert len(sim.simulate(seed=3, days=70).episodes) >= 8                         # unscripted: the usual random failures

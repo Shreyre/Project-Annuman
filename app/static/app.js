@@ -1,5 +1,7 @@
 const $ = (s) => document.querySelector(s);
-const state = { meta: null, day: 0, truth: false, sel: null, timer: null, rec: null,
+const NETS = ["demo", "kerala", "live"];
+const asked = new URLSearchParams(location.search).get("net");
+const state = { net: NETS.includes(asked) ? asked : "demo", meta: null, day: 0, truth: false, sel: null, timer: null, rec: null,
   cache: new Map(), side: new Map(), dayData: null, cells: [], byKey: new Map(), prevPhantom: null, prevDay: null, fresh: false };
 const REGIME = { OK: ["ok", "Stocked"], SCARCE: ["scarce", "Running short"], OUT: ["out", "Empty"] };
 const WORD = { tab: "tablets", cap: "capsules", sachet: "sachets" };
@@ -31,10 +33,11 @@ function notify(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { $("#toast").hidden = true; }, 5500);
 }
+const playLabel = (on) => (state.meta?.live ? (on ? "Pause feed" : "Start feed") : on ? "Pause" : "Play");
 function stopReplay() {
-  clearInterval(state.timer);
+  clearTimeout(state.timer);
   state.timer = null;
-  $("#play span").textContent = "Play";
+  $("#play span").textContent = playLabel(false);
   $("#play").setAttribute("aria-pressed", "false");
 }
 function showError(message) {
@@ -48,7 +51,7 @@ function renderSignals() {
   const region = $("#stateFilter").value, status = $("#statusFilter").value;
   const matches = (c) => {
     const p = place(c.f), words = `${p.st} ${p.wh} ${p.phc} ${drugName(c.j)} ${state.meta.facilities[c.f].id}`.replace(/\s+/g, " ").toLowerCase();
-    return (!query || words.includes(query)) && (!region || state.meta.facilities[c.f].st === region)
+    return (!query || words.includes(query)) && (!region || [state.meta.facilities[c.f].st, state.meta.facilities[c.f].wh].includes(region))
       && (!status || (status === "phantom" ? c.phantom : c.regime === status));
   };
   const rank = (c) => c.phantom ? 0 : c.regime === "OUT" ? 1 : c.regime === "SCARCE" ? 2 : 3;
@@ -60,7 +63,7 @@ function renderSignals() {
   state.animateList = false;
   $("#signalList").innerHTML = rows.length ? `<div class="scroll"><table class="signal-table"><thead><tr><th scope="col">Facility and medicine</th><th scope="col">Shelf</th><th scope="col" class="register-col num">Register</th><th scope="col" class="num">Days left</th></tr></thead><tbody>${visible.map((c, i) => {
     const p = place(c.f), [cls, word] = REGIME[c.regime], selected = state.sel?.f === c.f && state.sel?.j === c.j;
-    return `<tr class="${selected ? "selected" : ""}" data-f="${c.f}" data-j="${c.j}" style="--i:${i}"><td><button class="signal-link" data-f="${c.f}" data-j="${c.j}" aria-pressed="${selected}" aria-label="Investigate ${p.phc}, ${p.wh}, ${p.st}, ${drugName(c.j)}">${drugName(c.j)}</button><small>${p.phc}, ${p.wh}, ${p.st}</small></td><td><span class="badge ${cls}${c.phantom ? " phantom" : ""}">${c.phantom ? "Hidden stock-out" : word}</span>${c.confirmed ? '<small>Shelf check recorded</small>' : ''}</td><td class="register-col num"><span class="ledger${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unitOf(c.j)}</small></td><td class="num">${c.shadow === null ? '<small>No use yet</small>' : `<span class="days">${fmt(c.shadow)}</span><span class="cover ${cls}" style="--v:${Math.min(100, Math.round((100 * c.shadow) / 30))}%" aria-hidden="true"></span>`}${c.true === undefined ? '' : `<small>Actual: ${fmt(c.true)} ${unitOf(c.j)}</small>`}</td></tr>`;
+    return `<tr class="${selected ? "selected" : ""}" data-f="${c.f}" data-j="${c.j}" style="--i:${i}"><td><button class="signal-link" data-f="${c.f}" data-j="${c.j}" aria-pressed="${selected}" aria-label="Investigate ${p.phc}, ${p.wh}, ${p.st}, ${drugName(c.j)}">${drugName(c.j)}</button><small>${p.phc}, ${p.wh}, ${p.st}${c.as_of === undefined ? "" : `. Last report: day ${c.as_of}`}</small></td><td><span class="badge ${cls}${c.phantom ? " phantom" : ""}">${c.phantom ? "Hidden stock-out" : word}</span>${c.confirmed ? '<small>Shelf check recorded</small>' : ''}</td><td class="register-col num"><span class="ledger${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unitOf(c.j)}</small></td><td class="num">${c.shadow === null ? '<small>No use yet</small>' : `<span class="days">${fmt(c.shadow)}</span><span class="cover ${cls}" style="--v:${Math.min(100, Math.round((100 * c.shadow) / 30))}%" aria-hidden="true"></span>`}${c.true === undefined ? '' : `<small>Actual: ${fmt(c.true)} ${unitOf(c.j)}</small>`}</td></tr>`;
   }).join("")}</tbody></table></div>` : `<div class="empty-state"><strong>No matching signals</strong><p>Try another medicine, facility, or availability filter.</p><button class="button" id="clearFilters">Clear filters</button></div>`;
   document.querySelectorAll(".metric").forEach((m) => m.setAttribute("aria-pressed", String(m.dataset.status === status)));
   $("#signalList").setAttribute("aria-busy", "false");
@@ -77,6 +80,7 @@ function renderSignals() {
 const VIEWS = {
   overview: ["Overview", "Network overview", "The register says it’s on the shelf. The care says otherwise."],
   transfers: ["Redistribution", "Put supply where it’s needed", "Prioritize transfers and escalate the gaps that need a wider response."],
+  care: ["Beds & staff", "Beds and staff", "Where a bed is free, and which attendance marks the care record does not back."],
   "national-view": ["National view", "See the bigger picture", "Connect state-level signals while keeping care records local."],
   validation: ["Performance", "Confidence, backed by evidence", "What the model catches, how early, and where it falls short."]
 };
@@ -100,12 +104,14 @@ function drugName(j) {   // names come from the (Gemini-compiled) rulebook, so e
 }
 const drugOf = (name) => state.meta.drugs.findIndex((d) => d.name === name);
 const unitOf = (j) => WORD[state.meta.drugs[j].unit] || "units";
-function place(f) {
-  const [s, w, p] = state.meta.facilities[f].id.split("-");
-  return { st: `State\u00a0${+s.slice(1) + 1}`, wh: `Warehouse\u00a0${String.fromCharCode(65 + +w.slice(1))}`, phc: `PHC\u00a0${+p.slice(1) + 1}` };   // never split "PHC 6" across lines
+function place(f) {   // a scenario names its real state and districts; the demo network is numbered
+  const fac = state.meta.facilities[f], [, w, p] = fac.id.split("-"), named = state.meta.names.warehouses?.[fac.wh];
+  return { st: stateName(fac.st), wh: named ? esc(named) : `Warehouse\u00a0${String.fromCharCode(65 + +w.slice(1))}`, phc: `PHC\u00a0${+p.slice(1) + 1}` };   // never split "PHC 6" across lines
 }
 const facOf = (id) => state.meta.facilities.findIndex((x) => x.id === id);
-const stateName = (id) => `State\u00a0${+id.slice(1) + 1}`;
+const stateName = (id) => (state.meta.names.states?.[id] ? esc(state.meta.names.states[id]) : `State\u00a0${+id.slice(1) + 1}`);
+const api = (path) => `${path}${path.includes("?") ? "&" : "?"}net=${state.net}`;   // every call names its network
+const road = (minutes) => (state.meta.real_roads ? `${minutes} min by road` : `about ${minutes} min by road`);
 async function get(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${url} answered ${r.status}`);
@@ -145,6 +151,7 @@ function buildGrid() {
   }
   const grid = $("#grid");
   grid.innerHTML = html;
+  state.cells = [];
   grid.querySelectorAll(".cell").forEach((b) => { state.cells[+b.dataset.f * drugs.length + +b.dataset.j] = b; });
   if (grid.dataset.bound) return;
   grid.dataset.bound = "true";
@@ -233,7 +240,7 @@ function headline(data, draw = false) {
 function setDay(t) {   // the thumb and fill glide to the new day; the counter rolls to it
   $("#day").value = t;
   tween($("#dayOut"), t);
-  $(".range").style.setProperty("--t", t / (state.meta.days - 1));
+  $(".range").style.setProperty("--t", t / Math.max(1, state.meta.clock));
 }
 function fading(el, on) {   // keep what is on screen while the next day loads, instead of flashing a skeleton
   if (on && !el.children.length) el.innerHTML = '<div class="skeleton" role="status" aria-label="Loading"></div>';
@@ -246,10 +253,10 @@ async function show(t) {
   setDay(t);
   $("#signalList").setAttribute("aria-busy", "true");
   $("#detail").inert = true;
-  fading($("#moves"), true);
-  fading($("#national"), true);
+  const rails = ["#moves", "#careBoard", "#national"].map($);
+  rails.forEach((el) => fading(el, true));
   try {
-  const data = await cached(state.cache, `${t}|${truth}`, `/api/day/${t}${truth ? "?truth=true" : ""}`);
+  const data = await cached(state.cache, `${t}|${truth}`, api(`/api/day/${t}${truth ? "?truth=true" : ""}`));
   if (state.request !== request) return;
   state.dayData = data;
   state.dayTruth = truth;
@@ -257,13 +264,14 @@ async function show(t) {
   paintGrid(data);
   headline(data, state.fresh);
   const detail = state.sel ? renderDetail() : Promise.resolve();
-  const [plan, nat] = await Promise.all([cached(state.side, `plan|${t}`, `/api/plan?t=${t}`),
-    cached(state.side, `nat|${t}`, `/api/national?t=${t}`)]);
+  const [plan, board, nat] = await Promise.all([cached(state.side, `plan|${t}`, api(`/api/plan?t=${t}`)),
+    cached(state.side, `care|${t}|${truth}`, api(`/api/care?t=${t}${truth ? "&truth=true" : ""}`)),
+    cached(state.side, `nat|${t}`, api(`/api/national?t=${t}`))]);
   if (state.request !== request) return;
   renderMoves(plan);
+  renderCare(board);
   renderNational(nat);
-  fading($("#moves"), false);
-  fading($("#national"), false);
+  rails.forEach((el) => fading(el, false));
   await detail;
   $("#detail").inert = false;
   } catch (e) {
@@ -277,9 +285,9 @@ async function show(t) {
       await renderDetail();
     }
     $("#detail").inert = false;
-    fading($("#moves"), false);
-    fading($("#national"), false);
+    rails.forEach((el) => fading(el, false));
     $("#moves").innerHTML = '<p class="note">Transfer recommendations are unavailable. Use Try again above to reload.</p>';
+    $("#careBoard").innerHTML = '<p class="note">Beds and staff are unavailable. Use Try again above to reload.</p>';
     $("#national").innerHTML = '<p class="note">The national summary is unavailable. Use Try again above to reload.</p>';
     showError("We couldn’t load this replay day. Check your connection and try again.");
   }
@@ -355,7 +363,7 @@ function evidence(c, p) {   // why triage picked this level, from the warehouse 
   return {
     LOCAL: `${p.wh} is being supplied by the state${filled} and demand is normal, so the problem is at this PHC.`,
     WAREHOUSE: `The state has stopped filling ${p.wh}'s indents for this medicine${filled}, while other warehouses in ${p.st} are still supplied.`,
-    "STATE-PROCUREMENT": `The state has stopped filling this medicine's indents at two or more of ${p.st}'s warehouses.`,
+    "STATE-PROCUREMENT": `The state has stopped filling this medicine's indents at ${c.starved} of ${p.st}'s ${c.warehouses} warehouses. One warehouse failing on its own would not look like this.`,
     NATIONAL: "Warehouses in more than one state have stopped receiving this medicine. No single state can fix that.",
     "DEMAND-SURGE": `Diagnoses across ${p.st} for the conditions this medicine treats are ${pct(c.lift - 1)} above normal, while ${p.wh} is still being supplied. This is a demand surge, not a supply failure.`,
   }[c.level];
@@ -403,8 +411,8 @@ async function renderDetail() {
   const c = state.dayData.cells.find((x) => x.f === f && x.j === j);
   const tq = state.truth ? "&truth=true" : "";
   try {
-  const [s, fc, fa] = await Promise.all([get(`/api/series/${f}/${j}?t=${t}${tq}`),
-    get(`/api/forecast/${f}/${j}?t=${t}`), get(`/api/facility/${f}?t=${t}${tq}`)]);
+  const [s, fc, fa] = await Promise.all([get(api(`/api/series/${f}/${j}?t=${t}${tq}`)),
+    get(api(`/api/forecast/${f}/${j}?t=${t}`)), get(api(`/api/facility/${f}?t=${t}${tq}`))]);
   if (state.detailRequest !== request || state.day !== t || state.truth !== truthMode || state.sel.f !== f || state.sel.j !== j) return;
   const p = place(f), [cls, word] = REGIME[c.regime], unit = unitOf(j);
   const sum = (k) => s[k].slice(-14).reduce((a, b) => a + b, 0);
@@ -419,7 +427,7 @@ async function renderDetail() {
     <p class="action ${["LOCAL", "WAREHOUSE", "DEMAND-SURGE"].includes(c.level) ? "local" : ""}"><strong>Suggested next step:</strong> ${esc(state.meta.actions[c.level])}. Where it broke is read from the warehouse ledger; confirm with the district store before escalating.</p>
     <h3>Brief for the district officer</h3>
     <p class="why">Gemini writes it from the evidence above, in the officer's language.</p>
-    <p><select id="briefLang" aria-label="Language of the brief"><option value="en">English</option><option value="or" lang="or">ଓଡ଼ିଆ (Odia)</option>
+    <p class="brief-ask"><select id="briefLang" aria-label="Language of the brief"><option value="en">English</option><option value="or" lang="or">ଓଡ଼ିଆ (Odia)</option>
       <option value="hi" lang="hi">हिन्दी (Hindi)</option><option value="ml" lang="ml">മലയാളം (Malayalam)</option></select>
       <button type="button" class="button" id="briefBtn">Write brief</button></p>
     <div id="briefOut" role="status"></div>`;
@@ -513,7 +521,7 @@ async function confirmShelf(answer) {
   const { f, j } = state.sel;
   $("#confirmMsg").textContent = "Saving shelf check…";
   try {
-    const r = await fetch("/api/confirm", { method: "POST", headers: { "Content-Type": "application/json" },
+    const r = await fetch(api("/api/confirm"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ f, j, t: state.day, answer }) });
     if (!r.ok) throw new Error(`the server answered ${r.status}`);
     await refreshAfterAnswer();
@@ -552,7 +560,7 @@ async function recordAnswer(btn) {
     say("Listening to the answer…");
     try {
       const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-      const r = await fetch(`/api/voice?f=${f}&j=${j}&t=${t}`, { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
+      const r = await fetch(api(`/api/voice?f=${f}&j=${j}&t=${t}`), { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
       if (r.status === 503) return say("Voice is unavailable on this demo. Use the shelf-check buttons.");
       if (r.status === 429) return say("Voice answers are used up for today. Use the shelf-check buttons.");
       if (!r.ok) return say("The recording could not be used. Record again, or use the buttons.");
@@ -589,7 +597,7 @@ function renderMoves(plan) {
     return `<li class="move${mine ? " mine" : ""}">
       <span class="qty"><span class="vh">Send</span><b>${m.courses}</b> courses<small>${fmt(m.units)} ${unitOf(j)}</small></span>
       <span class="med">${drugName(j)}</span>
-      <span class="route"><span class="vh">from</span>${end(m.from_fac)}<span class="road">${m.minutes} min by road</span><span class="vh">to</span>${end(m.to_fac)}</span>
+      <span class="route"><span class="vh">from</span>${end(m.from_fac)}<span class="road">${road(m.minutes)}</span><span class="vh">to</span>${end(m.to_fac)}</span>
       <span class="st">${place(facOf(m.to_fac)).st}${m.approved ? '<small class="done">Order approved</small>'
         : `<button type="button" class="button" data-approve="${esc(JSON.stringify({ from_fac: m.from_fac, to_fac: m.to_fac, drug: m.drug }))}">Approve</button>`}</span></li>`;
   }).join("");
@@ -605,14 +613,15 @@ function renderMoves(plan) {
       <span><strong>${drugName(drugOf(drug))}</strong> in ${stateName(st)}: ${n} ${n === 1 ? "PHC" : "PHCs"} short. ${esc(cap(state.meta.actions[level]))}.</span></li>`;
   }).join("");
   $("#moves").innerHTML = (shown ? `<ul class="moves">${shown}</ul>${more}` : `<p class="note">Nothing to move today. No PHC in a local shortage has a calm neighbour with stock to spare.</p>`)
-    + (escRows ? `<h3>Escalate instead of moving stock</h3><ul class="plain esc">${escRows}</ul>` : "");
+    + (escRows ? `<h3>Escalate instead of moving stock</h3><ul class="plain esc">${escRows}</ul>` : "")
+    + (state.meta.real_roads ? "" : '<p class="note">Road times in this network are estimated from straight-line distance. The demo network uses Google Maps road times.</p>');
   $("#moves").querySelectorAll("[data-approve]").forEach((b) => b.addEventListener("click", () => approveMove(b)));
 }
 
 async function approveMove(b) {   // the district officer's one click: the transfer becomes an issue order
   b.disabled = true;
   try {
-    const r = await fetch("/api/approve", { method: "POST", headers: { "Content-Type": "application/json" },
+    const r = await fetch(api("/api/approve"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ t: state.day, ...JSON.parse(b.dataset.approve) }) });
     if (!r.ok) throw new Error(`approve answered ${r.status}`);
     const o = await r.json();
@@ -631,7 +640,7 @@ async function writeBrief() {   // Gemini turns the evidence above into a brief 
   btn.disabled = true;
   out.textContent = "Gemini is writing the brief…";
   try {
-    const b = await get(`/api/brief/${f}/${j}?t=${t}&language=${lang}`);
+    const b = await get(api(`/api/brief/${f}/${j}?t=${t}&language=${lang}`));
     if (state.sel.f !== f || state.sel.j !== j || state.day !== t) return;
     out.innerHTML = `<p class="why" lang="${lang}">${esc(b.summary)}</p><p class="action" lang="${lang}"><strong>Next step:</strong> ${esc(b.next_step)}</p>`;
   } catch (e) {
@@ -651,16 +660,18 @@ function renderNational(n) {
       <td class="num">${fmt(ok)}</td><td class="num">${fmt(sc)}</td><td class="num">${fmt(out)}</td>
       <td class="num">${fmt(n.raw_rows[ex.state])} records</td><td class="num">${(n.export_bytes[ex.state] / 1024).toFixed(1)} KB of counts</td></tr>`;
   }).join("");
+  const whs = Object.fromEntries(n.exports.map((ex) => [ex.state, new Set(ex.rows.map((r) => r.warehouse)).size]));
   const flags = Object.entries(n.view).flatMap(([drug, v]) => {
-    const j = drugOf(drug), out = [];
+    const j = drugOf(drug), out = [], st = v.short_states[0];
     if (v.national) out.push(`<li><strong>${drugName(j)}</strong>: warehouses in ${v.short_states.map(stateName).join(" and ")} have stopped receiving it. Likely national supply failure. In testing this flag caught every injected national failure, about a month in and before most of the PHC stock-outs it caused.</li>`);
+    else if (st) out.push(`<li><strong>${drugName(j)}</strong>: ${v.starved[st]} of ${whs[st]} warehouses in ${stateName(st)} have stopped receiving it, and no other state shows the same. Likely a state procurement failure, for ${stateName(st)} to fix.</li>`);
     else if (v.surge) out.push(`<li><strong>${drugName(j)}</strong>: demand is surging across states. Raise indents.</li>`);   // a supply break outranks a surge, as in triage
     return out;
   }).join("");
   const priors = Object.entries(n.priors).map(([drug, p]) =>
     `<tr><th scope="row">${drugName(drugOf(drug))}</th><td class="num">${pct(p.rho)}</td><td class="num">${pct(p.tau)}</td></tr>`).join("");
   $("#national").innerHTML = `<div class="scroll"><table class="data"><thead><tr><th scope="col">State</th><th scope="col">Share of PHC medicines</th><th scope="col" class="num">Stocked</th><th scope="col" class="num">Running short</th><th scope="col" class="num">Empty</th><th scope="col" class="num">Kept inside the state</th><th scope="col" class="num">Sent to the national view</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <h3>Patterns across states</h3>${flags ? `<ul class="plain">${flags}</ul>` : `<p class="note">No medicine shows a cross-state pattern today.</p>`}
+    <h3>Patterns across states</h3>${flags ? `<ul class="plain">${flags}</ul>` : `<p class="note">No medicine shows a state-wide or cross-state pattern today.</p>`}
     <details><summary>What states get back</summary>
       <p class="note">National medians a new state can start from instead of waiting a month: how closely prescribing follows the rulebook, and how far registers can be trusted. In testing, a state three days in had fewer false alarms with these than with its own three days in 7 of 10 cases (more in 1), matching a month of its own history.</p>
       <div class="scroll"><table class="data"><thead><tr><th scope="col">Medicine</th><th scope="col" class="num">Prescribing follows the rulebook</th><th scope="col" class="num">Register trust</th></tr></thead><tbody>${priors}</tbody></table></div>
@@ -678,27 +689,173 @@ function proof(m) {
     ["Simple threshold on the same rulebook", m.crg_rule]].filter(([, r]) => r);
   $("#proof").innerHTML = `<thead><tr><th scope="col">Method</th><th scope="col">Stock-outs of 4+ days caught</th><th scope="col">Warned before the shelf emptied</th><th scope="col">Typical warning</th><th scope="col" class="num">False alarms per medicine per year</th></tr></thead>
     <tbody>${rows.map(([n, r], k) => `<tr${k ? "" : ' class="lead"'}><th scope="row">${n}</th>${meter(r.recall_4d)}${meter(r.early)}<td>${lead(r.median_lead)}</td><td class="num">${r.false_per_series_year.toFixed(2)}</td></tr>`).join("")}</tbody>`;
+  const day = m.empty_days;
+  $("#dayNote").textContent = `Day by day, on the days a shelf was truly empty, Anumaan called it empty on ${pct(day.model.found)} of them and was right ${pct(day.model.right)} of the times it said so. The register showed under half a day of use on ${pct(day.register.found)} of those days.`;
   $("#triageNote").textContent = `Where it broke is read from the warehouse ledger: right for ${pct(m.triage_7d.accuracy)} of alarms a week after they start, against ${pct(m.triage_majority)} for always guessing the commonest cause. Early warning comes from staff rationing and from deliveries minus dispensing; where staff never ration, Anumaan still warns before the shelf empties for more than half of outages.`;
 }
 
-async function init() {
-  ["#day", "#truth", "#play"].forEach((s) => { $(s).disabled = true; });
+function staffMark(x) {   // one cadre at one PHC: the attendance mark, questioned or not
+  const truth = x.true_present === undefined ? "" : `<small>${x.true_present ? "Truly at work" : "Truly away"}</small>`;
+  if (!x.in_position) return '<span class="quiet">Vacant</span>';
+  if (x.verify) return `<span class="badge out">Check</span>${truth}`;
+  return (x.marked_present ? '<span class="badge">Present</span>' : '<span class="quiet">Absent</span>') + truth;
+}
+
+function renderCare(b) {   // beds and staff for every PHC: what to act on first, then the whole network
+  const s = b.summary, where = (f, st = true) => { const p = place(f); return `<strong>${p.phc}</strong>, ${p.wh}${st ? `, ${p.st}` : ""}`; };
+  const full = b.rows.filter((r) => r.pressure).sort((x, y) => y.full_7d - x.full_7d);      // the longest-full first
+  const checks = b.rows.flatMap((r) => r.staff.filter((x) => x.verify).map((x) => [r, x])).sort((x, y) => y[1].verify_7d - x[1].verify_7d);
+  const rest = (n, what) => (n > 8 ? `<p class="note">And ${n - 8} more ${what}, in the table below.</p>` : "");
+  $("#careCount").textContent = full.length + checks.length;
+  const stat = (n, label, note) => `<div class="stat"><strong>${fmt(n)}</strong><span>${label}</span><small>${note}</small></div>`;
+  const beds = full.slice(0, 8).map((r) => `<li><span class="tag nat">Every bed taken</span><span>${where(r.f)}: all ${r.capacity} beds in use, as on ${r.full_7d} of the last 7 days${r.early_share_7d ? `; ${pct(r.early_share_7d)} of last week's discharges were early` : ""}.
+    ${r.refer ? `Nearest free bed: ${where(r.refer.f, false)}, ${road(r.refer.minutes)}, ${r.refer.free} free.` : `No PHC within ${b.refer_minutes} minutes has a free bed. Refer to the community health centre.`}${r.true_occupied === undefined ? "" : ` <em>Ground truth: ${r.true_occupied} occupied.</em>`}</span></li>`).join("");
+  const marks = checks.slice(0, 8).map(([r, x]) => `<li><span class="tag">Check attendance</span><span>${where(r.f)}: ${esc(CADRE[x.cadre].toLowerCase())} marked present, but ${x.acts} of about ${Math.round(x.expected)} expected tasks are in the care record${x.verify_7d > 1 ? `. Flagged on ${x.verify_7d} of the last 7 days` : ""}.${x.true_present === undefined ? "" : ` <em>Ground truth: ${x.true_present ? "at work" : "away"}.</em>`}</span></li>`).join("");
+  const audit = b.rows.filter((r) => r.audit && r.audit.marked / r.audit.away >= 0.2).sort((x, y) => y.audit.marked / y.audit.away - x.audit.marked / x.audit.away)
+    .slice(0, 5).map((r) => `<li><span class="tag">Audit the register</span><span>${where(r.f)}: in the last ${b.audit_days} days the care record showed a role away ${r.audit.away} times, and the attendance feed marked it present on ${r.audit.marked} of them (${pct(r.audit.marked / r.audit.away)}).</span></li>`).join("");
+  const groups = new Map();
+  b.rows.forEach((r) => { const wh = state.meta.facilities[r.f].wh; groups.set(wh, [...(groups.get(wh) || []), r]); });
+  const body = [...groups.values()].map((rows) => `<tbody>${rows.map((r, i) => {
+    const p = place(r.f), dots = Array.from({ length: r.capacity }, (_, k) => `<i class="${k < r.occupied ? "on" : ""}"></i>`).join("");
+    return `<tr>${i ? "" : `<th scope="rowgroup" rowspan="${rows.length}" class="wh">${p.wh}<small>${p.st}</small></th>`}<th scope="row">${p.phc}${r.as_of === undefined ? "" : `<small>Last report: day ${r.as_of}</small>`}</th>
+      <td><span class="beds" aria-hidden="true">${dots}</span><small>${r.occupied} of ${r.capacity}${r.pressure ? ", full" : ""}</small></td>${r.staff.map((x) => `<td>${staffMark(x)}</td>`).join("")}</tr>`;
+  }).join("")}</tbody>`).join("");
+  $("#careBoard").innerHTML = `<div class="stats">${stat(s.beds - s.occupied, "Beds free", `of ${fmt(s.beds)} across the network`)}${stat(s.full, s.full === 1 ? "PHC with every bed taken" : "PHCs with every bed taken", s.no_bed_near ? `${s.no_bed_near} with no free bed nearby` : "each has a free bed nearby")}${stat(s.verify, s.verify === 1 ? "Attendance mark to check" : "Attendance marks to check", "marked present, no work recorded")}${stat(s.vacant, "Posts vacant", "of the sanctioned strength")}</div>
+    <h3>Beds: where to send the next patient</h3>${beds ? `<ul class="plain esc">${beds}</ul>${rest(full.length, "full PHCs")}` : '<p class="note">No PHC is full today.</p>'}
+    <h3>Attendance: marks the care record does not back</h3>${marks ? `<ul class="plain esc">${marks}</ul>${rest(checks.length, "marks to check")}` : '<p class="note">Every attendance mark today is backed by that role’s work in the care record, or the day was too quiet to tell.</p>'}
+    <h3>Attendance registers to audit</h3>${audit ? `<ul class="plain esc">${audit}</ul>` : '<p class="note">No PHC’s attendance marks disagree with its care record often enough to single out yet.</p>'}
+    <details><summary>Every PHC</summary><div class="scroll"><table class="data board"><thead><tr><th scope="col">District warehouse</th><th scope="col">PHC</th><th scope="col">Beds</th>${state.meta.cadres.map((k) => `<th scope="col">${CADRE[k]}</th>`).join("")}</tr></thead>${body}</table></div></details>`;
+}
+
+function renderContext() {   // what is different about this network, shown above every view
+  const m = state.meta, box = $("#context");
+  box.hidden = !(m.scenario || m.live);
+  if (m.scenario) {
+    const s = m.scenario;
+    const links = s.sources.map((x) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.label)}</a>`).join(" and ");
+    box.innerHTML = `<div><strong>${esc(s.title)}</strong><p>${esc(s.script)}</p><p class="quiet">${esc(s.event)} Reports: ${links}.</p><p class="quiet">${esc(s.note)}</p></div>`;
+  } else if (m.live) {
+    const s = m.live, via = { "Pub/Sub": " The reports travel through Google Cloud Pub/Sub.", direct: " Pub/Sub is not configured on this copy, so the reports are applied directly." }[s.via] || " Press Start feed to send the next day’s reports.";
+    const log = s.log.map((e) => { const p = place(e.f); return `<li>Day ${e.day}, ${p.phc}, ${p.wh}, ${p.st}: ${[e.raised.length ? `new alarm on ${e.raised.map(drugName).join(", ")}` : "", e.cleared.length ? `alarm cleared on ${e.cleared.map(drugName).join(", ")}` : ""].filter(Boolean).join("; ")}</li>`; }).join("");
+    box.innerHTML = `<div><strong>Live feed: day ${s.day} of ${s.last}</strong><p>Each PHC’s day arrives as one message: its diagnoses, dispensing slips, register balances, admissions and attendance. ${s.reported} of ${s.phcs} PHCs have reported day ${s.day}${s.seconds === null ? "" : `, and their estimates were updated ${s.seconds} seconds after the reports were sent`}.${via}</p>${log ? `<ul class="feed-log" aria-label="Latest changes">${log}</ul>` : ""}</div><button type="button" class="button" id="restartFeed">Restart feed</button>`;
+    $("#restartFeed").addEventListener("click", restartFeed);
+  }
+}
+
+function setClock(n) {   // the last day there is data for: fixed in a replay, moving in the live feed
+  state.meta.clock = n;
+  $("#day").max = n;
+  $("#dayMax").textContent = n;
+}
+
+async function feedStep() {   // send the next day's reports, wait for them to land, then show that day
   try {
-    state.meta = await get("/api/meta");
-    $("#day").max = state.meta.days - 1;
-    $("#dayMax").textContent = state.meta.days - 1;
-    $("#grammarNote").textContent = `Rulebook ${state.meta.grammar}: ${state.meta.grammar_note}`;
-    const states = [...new Set(state.meta.facilities.map((f) => f.st))];
-    $("#networkSize").textContent = `${state.meta.facilities.length} PHCs, ${states.length} states, ${state.meta.drugs.length} medicines`;
-    $("#stateFilter").innerHTML = '<option value="">All states</option>' + states.map((s) => `<option value="${esc(s)}">${stateName(s)}</option>`).join("");
+    const r = await fetch("/api/live/step", { method: "POST" });
+    if (r.status === 409) { stopReplay(); return notify("The feed has reached its last day. Restart it to run again."); }
+    if (!r.ok) throw new Error(`step answered ${r.status}`);
+    const sent = await r.json();
+    let s = await get("/api/live");
+    for (let i = 0; i < 24 && !(s.day >= sent.day && s.complete); i++) {   // a Pub/Sub push lands within a second or two
+      await new Promise((done) => setTimeout(done, 250));
+      s = await get("/api/live");
+    }
+    if (state.net !== "live") return;
+    state.meta.live = s;
+    setClock(s.day);
+    renderContext();
+    state.cache.clear();
+    state.side.clear();
+    await show(s.day);
+  } catch (e) {
+    stopReplay();
+    notify("The feed stopped: the reports could not be sent. Try again.");
+  }
+}
+
+async function restartFeed(e) {
+  e.currentTarget.disabled = true;
+  stopReplay();
+  try {
+    const r = await fetch("/api/live/reset", { method: "POST" });
+    if (!r.ok) throw new Error(`reset answered ${r.status}`);
+    await init();
+    notify("The feed is back at its first day.");
+  } catch (err) {
+    notify("The feed could not be restarted. Try again.");
+    if ($("#restartFeed")) $("#restartFeed").disabled = false;
+  }
+}
+
+function realChart(s) {   // areas flagged each month for either fingerprint, with the first official notice marked
+  const W = 240, H = 64, pad = 14, n = s.months.length, bw = W / n, at = s.months.indexOf(s.notice_month);
+  const bar = (v, i, off, col, what) => (v ? `<rect x="${i * bw + off}" y="${H - pad - (v / s.icbs) * (H - pad - 4)}" width="${bw / 2 - 1}" height="${(v / s.icbs) * (H - pad - 4)}" fill="${col}"><title>${month(s.months[i])}: ${v} of ${s.icbs} ${what}</title></rect>` : "");
+  const bars = s.months.map((_, i) => bar(s.substituting.flagged[i], i, 1, "var(--sub)", "substituting") + bar(s.cut_short.flagged[i], i, bw / 2, "var(--scarce)", "cutting courses short")).join("");
+  return svg(W, H, `Areas flagged in each of ${n} months; the first official notice came in ${month(s.notice_month)}`, `
+    <line x1="0" x2="${W}" y1="${H - pad}" y2="${H - pad}" stroke="var(--rule)"/>${bars}
+    <line x1="${at * bw}" x2="${at * bw}" y1="0" y2="${H - pad}" stroke="var(--ink)" stroke-dasharray="3 3"/>
+    <text x="0" y="${H - 3}" font-size="10" fill="var(--muted)">${month(s.months[0])}</text>
+    <text x="${W}" y="${H - 3}" font-size="10" fill="var(--muted)" text-anchor="end">${month(s.months[n - 1])}</text>`);
+}
+const month = (m) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+
+function renderReal(d) {   // the premise, asked of real dispensing records: England's, because India publishes none
+  const most = (x, s) => { const v = Math.max(...x.flagged); return v ? `<strong>${v} of ${s.icbs}</strong><small>${month(s.months[x.flagged.indexOf(v)])}</small>` : "None"; };
+  const rows = d.shortages.map((s) => {
+    const first = [...s.cut_short.wide_months, ...s.substituting.wide_months].sort()[0], lead = s.months.indexOf(s.notice_month) - s.months.indexOf(first);
+    return `<tr><th scope="row">${esc(s.name)}</th><td>${month(s.notice_month)}</td><td>${most(s.substituting, s)}</td><td>${most(s.cut_short, s)}</td>
+      <td>${first ? `${month(first)}<small>${lead > 0 ? `${lead} ${lead === 1 ? "month" : "months"} before the notice` : lead ? "after the notice" : "the month of the notice"}</small>` : "Never"}</td><td>${realChart(s)}</td></tr>`;
+  }).join("");
+  const quiet = Math.max(...d.placebos.flatMap((p) => p.substituting.flagged)), cut = d.placebos.reduce((n, p) => n + p.cut_short.wide_months.length, 0);
+  const swide = d.placebos.some((p) => p.substituting.wide_months.length);
+  $("#realBody").innerHTML = `<p class="note">India publishes no dispensing records at this grain. England does, so this asks one thing of real data: when a medicine is officially declared short, do the fingerprints Anumaan reads show up in routine dispensing, in many areas at once? An area is one of England’s ${d.shortages[0].icbs} integrated care boards. It is flagged when it moves more than ${d.rule.z} robust standard deviations from its own ${d.rule.baseline_months} months before the first official notice.</p>
+    <div class="scroll"><table class="data real"><thead><tr><th scope="col">Declared shortage</th><th scope="col">First official notice</th><th scope="col">Substitutes’ share up: most areas flagged</th><th scope="col">Courses cut short: most areas flagged</th><th scope="col">Many areas at once, first met</th><th scope="col">Areas flagged, by month</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="chart-key" aria-hidden="true"><span><i class="sw sub"></i>Substituting</span><span><i class="sw scarce"></i>Cutting courses short</span><span><i class="dash"></i>First official notice</span></p>
+    <p class="note">Substitution showed in both shortages and cut-short courses in one, each in many areas at once, and both times the first signs came before the first official notice. That is not proof of early warning. Those earlier months fall inside each area’s own baseline year and are scored in hindsight, the makers reported supply trouble covering those months, and the data came out about two months in arrears. The Creon figures also lean on how capsules are counted; the README says how far.</p>
+    <p class="note">Two medicines with no declared shortage, over the same months: flagged for substitution in at most ${quiet} of ${d.shortages[0].icbs} areas${swide ? "" : ", never many at once"}. On cut-short courses the many-areas rule fired in ${cut} of their ${d.placebos.reduce((n, p) => n + p.months.length, 0)} months, as one medicine’s tablets per prescription drifted down.</p>
+    <p class="note">This tests the premise only. Anumaan’s filter was not run on this data; the figures are monthly totals per area, in another health system, for two shortages picked by hand. Data: <a href="${esc(d.source.url)}" target="_blank" rel="noopener">${esc(d.source.dataset)}</a>, ${esc(d.source.publisher)}, fetched ${esc(d.source.fetched)}. ${esc(d.source.attribution)}</p>`;
+  $("#real").hidden = false;
+}
+async function loadReal() {
+  try { renderReal(await get("/api/real")); } catch (e) { /* a copy without the cached data simply has no panel */ }
+}
+
+async function init() {   // the first load, and every change of network
+  const request = ++state.request, busy = ["#signalList", "#detail", "#moves", "#careBoard", "#national"].map($);
+  state.detailRequest++;
+  stopReplay();
+  clearTimeout(pending);
+  ["#day", "#truth", "#play"].forEach((s) => { $(s).disabled = true; });
+  document.querySelectorAll("#netSwitch button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.net === state.net)));
+  busy.forEach((el) => fading(el, true));
+  state.cache.clear();
+  state.side.clear();
+  Object.assign(state, { dayData: null, sel: null, prevPhantom: null, prevDay: null, page: 0 });
+  try {
+    const meta = await get(api("/api/meta"));
+    if (state.request !== request) return;   // a later switch of network took over
+    state.meta = meta;
+    setClock(meta.clock);
+    $("#play span").textContent = playLabel(false);
+    $("#grammarNote").textContent = `Rulebook ${meta.grammar}: ${meta.grammar_note}`;
+    const states = [...new Set(meta.facilities.map((f) => f.st))], whs = [...new Set(meta.facilities.map((f) => f.wh))];
+    const many = states.length > 1, count = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    $("#networkSize").textContent = `${meta.facilities.length} PHCs, ${many ? count(states.length, "state") : count(whs.length, "district")}, ${meta.drugs.length} medicines`;
+    $("#stateFilter").setAttribute("aria-label", many ? "Filter by state" : "Filter by district");
+    $("#stateFilter").innerHTML = `<option value="">${many ? "All states" : "All districts"}</option>` + (many
+      ? states.map((s) => `<option value="${esc(s)}">${stateName(s)}</option>`)
+      : whs.map((w) => `<option value="${esc(w)}">${place(meta.facilities.findIndex((f) => f.wh === w)).wh}</option>`)).join("");
+    renderContext();
     buildGrid();
-    const s = state.meta.start;
+    const s = meta.start;
     state.sel = { f: s.f, j: s.j };
     state.fresh = true;
     await show(s.day);
+    if (state.request !== request + 1) return;
+    busy.forEach((el) => fading(el, false));
     ["#day", "#truth", "#play"].forEach((s) => { $(s).disabled = false; });
-    await loadProof();
+    if (!$("#proof").children.length) await Promise.all([loadProof(), loadReal()]);
   } catch {
+    busy.forEach((el) => fading(el, false));
     showError("We couldn’t connect to the network. Check your connection and try again.");
     $("#signalList").setAttribute("aria-busy", "false");
     $("#detail").setAttribute("aria-busy", "false");
@@ -730,15 +887,24 @@ $("#truth").addEventListener("change", (e) => {
 $("#play").addEventListener("click", () => {
   clearTimeout(pending);
   if (state.timer) return stopReplay();
-  $("#play span").textContent = "Pause";
+  $("#play span").textContent = playLabel(true);
   $("#play").setAttribute("aria-pressed", "true");
+  const live = Boolean(state.meta.live);   // a replay steps through days it has; the live feed sends the next one
   const step = async () => {
-    if (state.day >= state.meta.days - 1) return stopReplay();
-    await show(state.day + 1);
-    if (state.timer) state.timer = setTimeout(step, 700);
+    if (live) await feedStep();
+    else if (state.day >= state.meta.clock) return stopReplay();
+    else await show(state.day + 1);
+    if (state.timer) state.timer = setTimeout(step, live ? 400 : 700);
   };
-  state.timer = setTimeout(step, 700);
+  state.timer = setTimeout(step, live ? 0 : 700);
 });
+document.querySelectorAll("#netSwitch button").forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.net === state.net) return;
+  if (state.saving || state.rec) { notify("Finish the shelf check before changing network."); return; }
+  state.net = b.dataset.net;
+  history.replaceState(null, "", `${state.net === "demo" ? location.pathname : `?net=${state.net}`}${location.hash}`);
+  init();
+}));
 ["#search", "#stateFilter", "#statusFilter"].forEach((s) => $(s).addEventListener(s === "#search" ? "input" : "change", () => { state.page = 0; state.animateList = true; renderSignals(); }));
 document.querySelectorAll(".metric").forEach((m) => m.addEventListener("click", () => {   // each count is also a filter
   $("#statusFilter").value = $("#statusFilter").value === m.dataset.status ? "" : m.dataset.status;

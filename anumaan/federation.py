@@ -165,19 +165,20 @@ class National:
 
     def view(self):
         """Per medicine, per state: starved warehouses (the state stopped filling their
-        indents). 2+ starved in a state is a state shortage; 2+ such states is a national
-        shortage (triage's rule, on aggregates alone). Demand-led alarms spread the same way
-        (MIN_HOT+ PHCs per warehouse) are a national surge: the fix is bigger indents, not
-        escalation to MoHFW."""
+        indents). A third of a state's warehouses starved (and at least 2) is a state shortage;
+        2+ such states is a national shortage (triage.wide, on aggregates alone). Demand-led
+        alarms spread the same way (MIN_HOT+ PHCs per warehouse) are a national surge: the fix
+        is bigger indents, not escalation to MoHFW."""
         spread = {}
+        n_wh = {s: len({r["warehouse"] for r in ex["rows"]}) for s, ex in self.exports.items()}   # those not suppressed
         for s, ex in self.exports.items():
             for r in ex["rows"]:
                 for key, hot in (("starved", r["starved"]), ("surge", r["surge"] >= MIN_HOT)):
                     h = spread.setdefault((r["drug"], key), {})
                     h[s] = h.get(s, 0) + hot
-        wide = lambda h: sum(n >= 2 for n in h.values()) >= 2
-        return {d: dict(starved=h, short_states=sorted(s for s, n in h.items() if n >= 2), national=wide(h),
-                        surge=wide(spread[(d, "surge")])) for (d, key), h in spread.items() if key == "starved"}
+        short = lambda h: sorted(s for s, n in h.items() if triage.wide(n, n_wh[s]))
+        return {d: dict(starved=h, short_states=short(h), national=len(short(h)) >= 2,
+                        surge=len(short(spread[(d, "surge")])) >= 2) for (d, key), h in spread.items() if key == "starved"}
 
     def priors(self):
         """What states receive back: per medicine, the median of the states' median rho and tau.
@@ -253,7 +254,7 @@ def main():
                   f"{len(node.fac) // len(set(node.wh))} PHCs per warehouse: {strict['suppressed']} suppressed, "
                   f"{len(strict['rows'])} warehouse rows and {len(strict['models'])} state-level model summaries "
                   f"({len(node.fac)} PHCs) left")
-            print("\nnational view, re-run on every day's exports (2+ states with 2+ starved warehouses);\n"
+            print("\nnational view, re-run on every day's exports (2+ states with a third of their warehouses starved);\n"
                   "  scored against the injected NATIONAL failures (GROUND TRUTH), counting its start to end + 21 days:")
         flags = {}      # (drug, "national" | "surge") -> flag per day
         for t in range(T):

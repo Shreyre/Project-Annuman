@@ -59,11 +59,14 @@ class Run:
 
 def simulate(seed=0, days=200, n_states=2, n_wh=3, n_phc=6, behaviour="default", crg=None,
              fill=(0.5, 1.0), wh_days=(30, 90), short=(0.0, 0.25), surge=0.5, gap_rate=0.01,
-             p_ration=None):
+             p_ration=None, episodes=None):
     """fill: share of a routine indent the warehouse actually sends; wh_days: warehouse
     buffer in days of network use; short: share of supply that still flows during an
     upstream failure; surge: peak monsoon lift of fever/diarrhoea; gap_rate: chance a
-    facility starts a 1-5 day data-entry gap on any day; p_ration: override rationing."""
+    facility starts a 1-5 day data-entry gap on any day; p_ration: override rationing;
+    episodes: script the failures instead of drawing them (a scenario replay): dicts of
+    type, root ("IN", a state, warehouse or facility id), drug id, start, dur and
+    optionally short. The default draws are untouched, so every seed's world is unchanged."""
     rng = np.random.default_rng(seed)
     ix = G.index(crg or G.load())
     B = dict(BEHAVIOUR[behaviour])
@@ -91,19 +94,22 @@ def simulate(seed=0, days=200, n_states=2, n_wh=3, n_phc=6, behaviour="default",
         rate[:, s] += 0.15 * rate[:, p]
 
     # --- injected failures: distinct drugs for the upstream ones, varied lengths ---
-    prim = [int(d) for d in rng.permutation(ix["primaries"])]
-    spec = [("NATIONAL", "IN", (50, 90), (40, 80)),
-            ("STATE-PROCUREMENT", f"S{rng.integers(n_states)}", (40, 100), (40, 80)),
-            ("WAREHOUSE", str(rng.choice(whs)), (40, 120), (25, 60)),
-            ("WAREHOUSE", str(rng.choice(whs)), (40, 120), (25, 60))]
-    eps = [dict(type=t, root=r, drug=prim[i], start=int(rng.integers(*s)), dur=int(rng.integers(*l)))
-           for i, (t, r, s, l) in enumerate(spec)]
-    for _ in range(4):
-        eps.append(dict(type="LOCAL", root=fac[rng.integers(F)], drug=prim[4 + rng.integers(len(prim) - 4)],
-                        start=int(rng.integers(40, 150)), dur=int(rng.integers(20, 50))))
+    if episodes is None:
+        prim = [int(d) for d in rng.permutation(ix["primaries"])]
+        spec = [("NATIONAL", "IN", (50, 90), (40, 80)),
+                ("STATE-PROCUREMENT", f"S{rng.integers(n_states)}", (40, 100), (40, 80)),
+                ("WAREHOUSE", str(rng.choice(whs)), (40, 120), (25, 60)),
+                ("WAREHOUSE", str(rng.choice(whs)), (40, 120), (25, 60))]
+        eps = [dict(type=t, root=r, drug=prim[i], start=int(rng.integers(*s)), dur=int(rng.integers(*l)))
+               for i, (t, r, s, l) in enumerate(spec)]
+        for _ in range(4):
+            eps.append(dict(type="LOCAL", root=fac[rng.integers(F)], drug=prim[4 + rng.integers(len(prim) - 4)],
+                            start=int(rng.integers(40, 150)), dur=int(rng.integers(20, 50))))
+    else:
+        eps = [dict(e, drug=ix["di"][e["drug"]]) for e in episodes]
     for e in eps:
         e["end"] = e["start"] + e["dur"]
-        e["short"] = float(rng.uniform(*short))
+        e.setdefault("short", float(rng.uniform(*short)))
     sub_for = {p: s for (_, s), p in ix["sub_of"].items()}
     for e in list(eps):                              # the substitute often fails with it
         if e["type"] != "LOCAL" and e["drug"] in sub_for and rng.random() < 0.5:

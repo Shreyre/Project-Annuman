@@ -1,5 +1,10 @@
+import base64
+import json
+import threading
+
 from fastapi.testclient import TestClient
 
+import app.main as main
 from anumaan import voice
 from app.main import app, briefs, gemini_used, ledger, replay
 
@@ -65,3 +70,118 @@ def test_approval_goes_to_the_ledger_and_the_brief_reads_the_same_evidence(monke
     assert len(seen) == 1                                          # the same evidence never pays Gemini twice
     assert client.get(f"/api/brief/{f}/{j}?t={t}&language=xx").status_code == 422
     ledger.clear(), briefs.clear()
+
+
+def test_beds_and_staff_board_sends_a_full_phc_to_the_nearest_free_bed():
+    t = client.get("/api/meta").json()["start"]["day"]
+    b = client.get(f"/api/care?t={t}&truth=true").json()
+    full = [r for r in b["rows"] if r["pressure"]]
+    assert full and b["summary"]["full"] == len(full) and all(r["free"] == 0 and r["full_7d"] >= 1 for r in full)
+    st = replay.run.st
+    for r in full:
+        to = b["rows"][r["refer"]["f"]]
+        assert to["free"] == r["refer"]["free"] > 0 and st[to["f"]] == st[r["f"]] and r["refer"]["minutes"] <= b["refer_minutes"]
+    assert all(r["refer"] is None for r in b["rows"] if not r["pressure"])
+    marks = [x for r in b["rows"] for x in r["staff"] if x["verify"]]
+    assert marks and b["summary"]["verify"] == len(marks) and all(x["marked_present"] and x["verify_7d"] >= 1 for x in marks)
+    one = client.get(f"/api/facility/{full[0]['f']}?t={t}&truth=true").json()      # the detail panel reads the same row
+    assert one["staff"] == full[0]["staff"] and one["beds"]["occupied"] == full[0]["occupied"] == full[0]["capacity"]
+
+
+def test_kerala_replay_calls_the_state_failure_and_escalates_it():
+    m = client.get("/api/meta?net=kerala").json()
+    assert m["names"]["states"] == {"S0": "Kerala"} and len(m["names"]["warehouses"]) == 14 and m["scenario"]["script"]
+    t, f, j = m["start"]["day"], m["start"]["f"], m["start"]["j"]
+    cells = client.get(f"/api/day/{t}?net=kerala").json()["cells"]
+    c = next(c for c in cells if (c["f"], c["j"]) == (f, j))
+    assert c["level"] == "STATE-PROCUREMENT" and c["warehouses"] == 14 and c["starved"] >= 5     # a third of the districts
+    early = client.get(f"/api/day/{main.scenario.BREAK}?net=kerala").json()["summary"]
+    assert early["STATE-PROCUREMENT"] == 0                                # nothing is called before the supply breaks
+    p = client.get(f"/api/plan?t={t}&net=kerala").json()
+    assert p["escalations"] and {e["level"] for e in p["escalations"]} == {"STATE-PROCUREMENT"}
+    view = client.get(f"/api/national?t={t}&net=kerala").json()["view"]
+    assert any(v["short_states"] == ["S0"] for v in view.values()) and not any(v["national"] for v in view.values())
+    assert main._facts(main._net("kerala"), t, f, j)["state"] == "Kerala"  # the brief names the real district too
+    assert client.get("/api/meta?net=nowhere").status_code == 404
+    assert client.get("/api/ledger?net=kerala").json() == []              # each network keeps its own orders
+
+
+def test_live_feed_gives_the_same_view_as_a_replay_of_the_same_records(monkeypatch):
+    live = main._net("live")
+    s = client.get("/api/live").json()
+    t0 = s["day"]
+    assert t0 == s["history"] - 1 and s["complete"] and client.get(f"/api/day/{t0 + 1}?net=live").status_code == 404
+    for _ in range(3):
+        assert client.post("/api/live/step").json()["via"] == "direct"    # no Pub/Sub topic in the tests
+    t = t0 + 3
+    batch = main.Replay(live.src, live.seed)                              # the same records, all at once
+    plain = lambda x: json.loads(json.dumps(x, default=float))
+    labels = batch.labels(t)
+    assert client.get(f"/api/day/{t}?net=live&truth=true").json()["cells"] == plain(
+        [batch.cell(t, f, j, labels, True) for f in range(len(live.upto)) for j in range(len(live.drugs))])
+    assert client.get(f"/api/care?t={t}&net=live").json() == plain(batch.board(t))
+    assert client.get(f"/api/national?t={t}&net=live").json()["exports"] == plain([n.export(t) for n in batch.nodes])
+
+    # the push endpoint: a token, Pub/Sub's envelope, at-least-once delivery, and a message it cannot read
+    msgs = live.feed(t + 1)
+    wrapped = {"message": {"data": base64.b64encode(json.dumps(msgs[0]).encode()).decode()}}
+    assert client.post("/api/ingest?token=x", json=wrapped).status_code == 403     # no token configured: closed
+    monkeypatch.setattr(main, "INGEST_TOKEN", "secret")
+    assert client.post("/api/ingest?token=wrong", json=wrapped).status_code == 403
+    assert client.post("/api/ingest?token=secret", json=wrapped).json()["ok"]
+    n = len(live.run.slips)
+    assert client.post("/api/ingest?token=secret", json=msgs[0]).json()["ok"] and len(live.run.slips) == n
+    assert not client.post("/api/ingest?token=secret", json=dict(msgs[1], phc="nowhere")).json()["ok"]
+    s = client.get("/api/live").json()
+    assert (s["day"], s["reported"], s["complete"]) == (t + 1, 1, False)
+    cells = client.get(f"/api/day/{t + 1}?net=live").json()["cells"]
+    assert [c.get("as_of") for c in cells[:len(live.drugs) + 1]] == [None] * len(live.drugs) + [t]   # the rest show their last report
+    assert client.post("/api/live/reset").json()["day"] == t0
+
+
+def test_a_report_landing_mid_request_waits_for_it(monkeypatch):
+    live = main._net("live")
+    t, labels, waited = live.clock, live.labels, []
+    late = threading.Thread(target=lambda: [live.ingest(m) for m in live.feed(t + 1)])
+
+    def labels_then_a_report_arrives(day):      # the alarm labels are worked out, then a push lands before the cells are read
+        out = labels(day)
+        late.start()
+        late.join(0.5)
+        waited.append(late.is_alive())
+        return out
+
+    monkeypatch.setattr(live, "labels", labels_then_a_report_arrives)
+    assert client.get(f"/api/day/{t}?net=live").status_code == 200 and waited == [True]     # it waited for the request's lock
+    late.join()
+    assert client.get("/api/live").json()["day"] == t + 1                                   # ...and then landed
+    main.nets.pop("live")
+
+
+def test_reports_pushed_together_in_any_order_give_the_same_view(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    monkeypatch.setattr(main, "INGEST_TOKEN", "secret")
+    live = main._net("live")
+    t0, bad = live.clock, []
+
+    def push(m):
+        wrapped = {"message": {"data": base64.b64encode(json.dumps(m).encode()).decode()}}
+        r = client.post("/api/ingest?token=secret", json=wrapped)
+        bad.extend([r.text] * (r.status_code != 200 or not r.json()["ok"]))
+
+    def read(t):
+        for url in (f"/api/day/{t}?net=live", f"/api/care?t={t}&net=live", f"/api/national?t={t}&net=live", f"/api/plan?t={t}&net=live"):
+            r = client.get(url)
+            bad.extend([url] * (r.status_code not in (200, 404)))      # 404: that day has not begun yet
+
+    with ThreadPoolExecutor(12) as pool:          # Pub/Sub pushes a day's reports together, some twice, in any order
+        for t in range(t0 + 1, t0 + 5):
+            msgs = live.feed(t)
+            jobs = [pool.submit(push, m) for m in msgs[::-1] + msgs[:6]] + [pool.submit(read, t) for _ in range(4)]
+            [j.result() for j in jobs]
+    assert not bad
+    batch, t = main.Replay(live.src, live.seed), t0 + 4
+    labels = batch.labels(t)
+    assert client.get(f"/api/day/{t}?net=live").json()["cells"] == json.loads(json.dumps(
+        [batch.cell(t, f, j, labels, False) for f in range(len(live.upto)) for j in range(len(live.drugs))], default=float))
+    assert client.post("/api/live/reset").json()["day"] == t0
