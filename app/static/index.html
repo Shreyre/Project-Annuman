@@ -5,21 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Anumaan reads medicine stock-outs from the care already being recorded, where the stock register hides them. Synthetic network demonstration.">
-<title>Anumaan · Overview</title>
+<title>Overview | Anumaan</title>
+<meta property="og:title" content="Anumaan">
+<meta property="og:description" content="The register says it’s on the shelf. The care says otherwise. Hidden medicine stock-outs, read from the care already being recorded.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#f2f4f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111724" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233a3e9e'/%3E%3Cpath d='M8 11h16M8 16h16M8 21h10' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M6 24 26 8' stroke='%23ff6b6b' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Odia:wght@500;600&family=Kalam:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body class="intro">
 <a class="skip-link" href="#main">Skip to content</a>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></symbol>
-  <symbol id="i-left" viewBox="0 0 20 20"><path d="m12 5-5 5 5 5"/></symbol>
-  <symbol id="i-right" viewBox="0 0 20 20"><path d="m8 5 5 5-5 5"/></symbol>
-  <symbol id="i-close" viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></symbol>
-</svg>
+<!-- Phosphor Icons 2.1.1 (MIT), regular weight and fill for play/pause: paths copied from @phosphor-icons/core -->
+<!-- an HTML div[hidden] hides the sprite with no stylesheet at all (hidden on the svg itself only works once CSS loads) -->
+<div hidden><svg aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
+  <symbol id="i-left" viewBox="0 0 256 256"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></symbol>
+  <symbol id="i-right" viewBox="0 0 256 256"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 256 256"><path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 256 256"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87a15.86,15.86,0,0,1,8.12-13.82,16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></symbol>
+</svg></div>
 
 <header class="top">
   <a class="brand" href="#overview" aria-label="Anumaan, overview">
@@ -28,20 +38,20 @@
   </a>
   <nav class="tabs" aria-label="Main navigation">
     <a href="#overview" data-view="overview" aria-current="page">Overview</a>
-    <a href="#transfers" data-view="transfers">Redistribution <span id="moveCount" class="count">–</span></a>
+    <a href="#transfers" data-view="transfers">Redistribution <span id="moveCount" class="count">…</span></a>
     <a href="#national-view" data-view="national-view">National view</a>
     <a href="#validation" data-view="validation">Performance</a>
   </nav>
   <div class="top-end">
-    <span class="synthetic" title="Every facility, patient and stock level here is simulated."><i aria-hidden="true"></i>Synthetic data</span>
-    <button id="help" class="icon-button round" type="button" aria-label="How Anumaan works">?</button>
+    <span class="synthetic" title="Every facility, patient and stock level here is simulated.">Synthetic data</span>
+    <button id="help" class="icon-button ghost" type="button" aria-label="How Anumaan works"><svg><use href="#i-help"/></svg></button>
   </div>
 </header>
 
 <main id="main" tabindex="-1">
   <section class="replay" aria-label="Replay controls">
-    <button id="play" class="play" type="button" aria-pressed="false" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path class="i-play" d="M6 4.5v11l9-5.5z"/><path class="i-pause" d="M5.5 4.5h3v11h-3zM11.5 4.5h3v11h-3z"/></svg><span>Play</span></button>
-    <label class="day" for="day">Day <output id="dayOut">–</output><span class="of">of <span id="dayMax">199</span></span></label>
+    <button id="play" class="play" type="button" aria-pressed="false" disabled><svg aria-hidden="true"><use class="i-play" href="#i-play"/><use class="i-pause" href="#i-pause"/></svg><span>Play</span></button>
+    <label class="day" for="day">Day <output id="dayOut">…</output><span class="of">of <span id="dayMax">199</span></span></label>
     <span class="range"><span class="range-fill" aria-hidden="true"></span><span class="range-thumb" aria-hidden="true"></span><input id="day" type="range" min="0" max="199" value="0" disabled></span>
     <label class="switch"><input id="truth" type="checkbox" role="switch" disabled><span class="track" aria-hidden="true"></span>Ground truth</label>
   </section>
@@ -54,16 +64,15 @@
 
   <section id="overview" class="view" aria-label="Network overview">
     <div class="metrics" id="legend" role="group" aria-label="Medicine availability. Select one to filter the list.">
-      <button type="button" class="metric priority" data-status="phantom" aria-pressed="false"><span class="metric-label"><i class="sw out phantom"></i>Hidden stock-outs</span><strong data-k="phantom">–</strong><span class="metric-note">Register shows stock, care says empty</span></button>
-      <button type="button" class="metric" data-status="OUT" aria-pressed="false"><span class="metric-label"><i class="sw out"></i>Empty shelves</span><strong data-k="out">–</strong><span class="metric-note">Including hidden stock-outs</span></button>
-      <button type="button" class="metric" data-status="SCARCE" aria-pressed="false"><span class="metric-label"><i class="sw scarce"></i>Running short</span><strong data-k="scarce">–</strong><span class="metric-note">Courses being cut short</span></button>
-      <button type="button" class="metric" data-status="OK" aria-pressed="false"><span class="metric-label"><i class="sw ok"></i>Stocked</span><strong data-k="ok">–</strong><span class="metric-note">Care and supply agree</span></button>
+      <button type="button" class="metric priority" data-status="phantom" aria-pressed="false"><span class="metric-label"><i class="sw out phantom"></i>Hidden stock-outs</span><strong data-k="phantom">…</strong><span class="metric-note">Register shows stock, care says empty</span></button>
+      <button type="button" class="metric" data-status="OUT" aria-pressed="false"><span class="metric-label"><i class="sw out"></i>Empty shelves</span><strong data-k="out">…</strong><span class="metric-note">Including hidden stock-outs</span></button>
+      <button type="button" class="metric" data-status="SCARCE" aria-pressed="false"><span class="metric-label"><i class="sw scarce"></i>Running short</span><strong data-k="scarce">…</strong><span class="metric-note">Courses being cut short</span></button>
+      <button type="button" class="metric" data-status="OK" aria-pressed="false"><span class="metric-label"><i class="sw ok"></i>Stocked</span><strong data-k="ok">…</strong><span class="metric-note">Care and supply agree</span></button>
     </div>
 
     <div class="insight">
       <span class="insight-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 11h16M8 16h16M8 21h10"/><path class="cut" d="M6 24 26 8" pathLength="1"/></svg></span>
       <div><strong>Look beyond the register</strong><p id="phantomLine">Connecting care records to medicine availability…</p></div>
-      <button id="reviewHidden" class="button" type="button" disabled>Review hidden stock-outs</button>
     </div>
 
     <div class="layout">
@@ -122,6 +131,6 @@
   <button id="startExploring" class="button primary" type="button">Explore the network</button>
 </dialog>
 <div id="tip" class="tip" aria-hidden="true" hidden></div><div id="toast" class="toast" role="status" hidden></div>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

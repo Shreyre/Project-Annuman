@@ -18,7 +18,8 @@ async (page) => {
   await page.locator('#nextPage').click();
   check((await page.locator('#pageNumber').innerText()).startsWith('2 /'), 'Next page failed');
   await page.locator('[data-display=matrix]').click();
-  check(await page.locator('.cell').count() === 288, 'Matrix lost facility/medicine cells');
+  const meta = await (await page.request.get('http://127.0.0.1:8788/api/meta')).json();
+  check(await page.locator('.cell').count() === meta.facilities.length * meta.drugs.length, 'Matrix lost facility/medicine cells');
   await page.locator('.cell').first().click();
   await page.waitForSelector('.detail-tabs');
   await page.locator('[data-display=list]').click();

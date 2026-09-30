@@ -60,7 +60,7 @@ function renderSignals() {
   state.animateList = false;
   $("#signalList").innerHTML = rows.length ? `<div class="scroll"><table class="signal-table"><thead><tr><th scope="col">Facility and medicine</th><th scope="col">Shelf</th><th scope="col" class="register-col num">Register</th><th scope="col" class="num">Days left</th></tr></thead><tbody>${visible.map((c, i) => {
     const p = place(c.f), [cls, word] = REGIME[c.regime], selected = state.sel?.f === c.f && state.sel?.j === c.j;
-    return `<tr class="${selected ? "selected" : ""}" data-f="${c.f}" data-j="${c.j}" style="--i:${i}"><td><button class="signal-link" data-f="${c.f}" data-j="${c.j}" aria-pressed="${selected}" aria-label="Investigate ${p.phc}, ${p.wh}, ${p.st}, ${drugName(c.j)}">${drugName(c.j)}</button><small>${p.phc}, ${p.wh}, ${p.st}</small></td><td><span class="badge ${cls}${c.phantom ? " phantom" : ""}">${c.phantom ? "Hidden stock-out" : word}</span>${c.confirmed ? '<small>Shelf check recorded</small>' : ''}</td><td class="register-col num"><span class="ledger${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unitOf(c.j)}</small></td><td class="num"><span class="days">${fmt(c.shadow)}</span><span class="cover ${cls}" style="--v:${Math.min(100, Math.round((100 * c.shadow) / 30))}%" aria-hidden="true"></span>${c.true === undefined ? '' : `<small>Actual: ${fmt(c.true)} ${unitOf(c.j)}</small>`}</td></tr>`;
+    return `<tr class="${selected ? "selected" : ""}" data-f="${c.f}" data-j="${c.j}" style="--i:${i}"><td><button class="signal-link" data-f="${c.f}" data-j="${c.j}" aria-pressed="${selected}" aria-label="Investigate ${p.phc}, ${p.wh}, ${p.st}, ${drugName(c.j)}">${drugName(c.j)}</button><small>${p.phc}, ${p.wh}, ${p.st}</small></td><td><span class="badge ${cls}${c.phantom ? " phantom" : ""}">${c.phantom ? "Hidden stock-out" : word}</span>${c.confirmed ? '<small>Shelf check recorded</small>' : ''}</td><td class="register-col num"><span class="ledger${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unitOf(c.j)}</small></td><td class="num">${c.shadow === null ? '<small>No use yet</small>' : `<span class="days">${fmt(c.shadow)}</span><span class="cover ${cls}" style="--v:${Math.min(100, Math.round((100 * c.shadow) / 30))}%" aria-hidden="true"></span>`}${c.true === undefined ? '' : `<small>Actual: ${fmt(c.true)} ${unitOf(c.j)}</small>`}</td></tr>`;
   }).join("")}</tbody></table></div>` : `<div class="empty-state"><strong>No matching signals</strong><p>Try another medicine, facility, or availability filter.</p><button class="button" id="clearFilters">Clear filters</button></div>`;
   document.querySelectorAll(".metric").forEach((m) => m.setAttribute("aria-pressed", String(m.dataset.status === status)));
   $("#signalList").setAttribute("aria-busy", "false");
@@ -70,7 +70,7 @@ function renderSignals() {
   $("#pageNumber").textContent = `${state.page + 1} / ${pages}`;
   $("#prevPage").disabled = state.page === 0;
   $("#nextPage").disabled = state.page >= pages - 1;
-  $("#resultCount").textContent = state.display === "list" && rows.length ? `${state.page * PAGE_SIZE + 1}–${Math.min(rows.length, (state.page + 1) * PAGE_SIZE)} of ${rows.length} signals` : `${rows.length} matching signals`;
+  $("#resultCount").textContent = state.display === "list" && rows.length ? `${state.page * PAGE_SIZE + 1}-${Math.min(rows.length, (state.page + 1) * PAGE_SIZE)} of ${rows.length} signals` : `${rows.length} matching signals`;
   state.cells.forEach((b, key) => { b.disabled = !matches(state.byKey.get(key)); });
 }
 
@@ -89,7 +89,7 @@ function navigate() {
   const [label, title, description] = VIEWS[key];
   $("#pageTitle").textContent = title;
   $("#pageDescription").textContent = description;
-  document.title = `Anumaan · ${label}`;
+  document.title = `${label} | Anumaan`;
   hideTip();
 }
 
@@ -436,10 +436,10 @@ async function renderDetail() {
     <h2>${drugName(j)}</h2>
     <p class="where">${p.phc}, ${p.wh}, ${p.st}, day ${t}</p>
     <div class="versus">
-      <div class="reg"><small>Register says</small><span class="ledger big${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unit}, ${c.cover} days of use</small></div>
+      <div class="reg"><small>Register says</small><span class="ledger big${c.phantom ? " struck" : ""}">${fmt(c.book)}</span><small>${unit}, ${c.cover === null ? "no use yet" : `${c.cover} days of use`}</small></div>
       <div class="shelf is-${cls}"><small>Shelf, inferred from care</small><span class="big">${word}</span><span class="meter" aria-hidden="true"><i style="width:${sure}%"></i></span><small>${sure}% sure</small></div>
     </div>
-    <p class="why">Deliveries in, minus what the dispensing slips took out: about <strong>${fmt(c.shadow)} days</strong> of use left${c.shadow < state.meta.low ? `, under the ${state.meta.low}-day warning line` : ""}.</p>
+    <p class="why">${c.shadow === null ? "No diagnosis here has called for this medicine yet, so there is no rate of use to count days against." : `Deliveries in, minus what the dispensing slips took out: about <strong>${fmt(c.shadow)} days</strong> of use left${c.shadow < state.meta.low ? `, under the ${state.meta.low}-day warning line` : ""}.`}</p>
     ${truth}
     <div class="detail-tabs" aria-label="Investigation sections"><button data-detail-tab="evidence">Evidence</button><button data-detail-tab="forecast">Forecast</button><button data-detail-tab="facility">Beds & staff</button></div>
     <section data-pane="evidence">
@@ -448,7 +448,7 @@ async function renderDetail() {
         ${fmt(sum("full"))} were given in full, ${fmt(sum("ration"))} were cut short, ${fmt(sum("sub"))} were switched to a guideline substitute and ${fmt(sum("na"))} were marked not available.</p>
       ${chart(s)}
       <p class="chart-key" aria-hidden="true">
-        <span><i class="sw" style="background:var(--ok)"></i>Full course</span><span><i class="sw scarce"></i>Cut short</span>
+        <span><i class="sw full"></i>Full course</span><span><i class="sw scarce"></i>Cut short</span>
         <span><i class="sw sub"></i>Substitute</span><span><i class="sw out"></i>Not available</span>
         <span><i class="dash"></i>Courses the diagnoses called for</span>
       </p>
@@ -682,7 +682,7 @@ function proof(m) {
 }
 
 async function init() {
-  ["#day", "#truth", "#play", "#reviewHidden"].forEach((s) => { $(s).disabled = true; });
+  ["#day", "#truth", "#play"].forEach((s) => { $(s).disabled = true; });
   try {
     state.meta = await get("/api/meta");
     $("#day").max = state.meta.days - 1;
@@ -696,7 +696,7 @@ async function init() {
     state.sel = { f: s.f, j: s.j };
     state.fresh = true;
     await show(s.day);
-    ["#day", "#truth", "#play", "#reviewHidden"].forEach((s) => { $(s).disabled = false; });
+    ["#day", "#truth", "#play"].forEach((s) => { $(s).disabled = false; });
     await loadProof();
   } catch {
     showError("We couldn’t connect to the network. Check your connection and try again.");
@@ -769,16 +769,6 @@ document.querySelectorAll("[data-display]").forEach((b) => b.addEventListener("c
     setTimeout(() => $("#grid").classList.remove("cascade"), 1200);
   }
 }));
-$("#reviewHidden").addEventListener("click", () => {
-  $("#search").value = "";
-  $("#stateFilter").value = "";
-  $("#statusFilter").value = "phantom";
-  state.page = 0;
-  state.animateList = true;
-  renderSignals();
-  $("#statusFilter").focus({ preventScroll: true });
-  $("#netTitle").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "center" });
-});
 $("#retry").addEventListener("click", async () => {
   $("#retry").disabled = true;
   try { if (state.dayData) await show(state.day); else await init(); }

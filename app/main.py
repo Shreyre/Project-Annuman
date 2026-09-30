@@ -99,8 +99,9 @@ class Replay:
         run, d = self.run, self.drugs[j]
         p = self.post[t, f, j]
         book = run.book[t, f, d]
-        c = dict(f=f, j=j, book=round(book), cover=round(book / max(self.use[t, f, j], 1e-9), 1),
-                 shadow=round(float(self.cover[t, f, j]), 1),
+        used = self.use[t, f, j] > 0      # no diagnosis has called for it yet: days of use are undefined, not huge
+        c = dict(f=f, j=j, book=round(book), cover=round(book / self.use[t, f, j], 1) if used else None,
+                 shadow=round(float(self.cover[t, f, j]), 1) if used else None,
                  p=[round(float(x), 3) for x in p], regime=FL.REGIMES[int(p.argmax())],
                  alarm=bool(self.onset[t, f, j] >= 0), phantom=bool(self.phantom(t, f, j)),
                  confirmed=(self.confirm.get((f, j)) or {}).get(t))
@@ -334,7 +335,8 @@ async def voice_confirm(request: Request, f: int, j: int, t: int, language: str 
     try:   # label_voice blocks for up to 30 s; keep it off the event loop
         heard = await run_in_threadpool(voice.label_voice, audio, mime,
                                         replay.run.ix["drugs"][replay.drugs[j]], language)
-    except ValueError as e:
+    except ValueError as e:     # rejected before any Gemini call: give the slot back
+        gemini_used[date.today()] -= 1
         raise HTTPException(422, str(e))
     except voice.VoiceUnavailable as e:
         raise HTTPException(503, str(e))

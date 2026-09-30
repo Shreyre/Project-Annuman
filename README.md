@@ -6,6 +6,15 @@ Anumaan ("inference") finds medicine stock-outs at Primary Health Centres that t
 
 Built for **Build with AI: Code for Communities, Second Edition**, Track 03 (Smart Health & Supply Chain Resilience).
 
+## Who benefits
+
+- **31,882 PHCs**, 25,354 rural and 6,528 urban, on 31 March 2023 ([Health Dynamics of India 2022-23](https://web.archive.org/web/20240911061043/https://mohfw.gov.in/sites/default/files/Health%20Dynamics%20of%20India%20%28Infrastructure%20%26%20Human%20Resources%29%202022-23_RE%20%281%29.pdf), MoHFW, pp. 25 and 123).
+- **About 90 crore people behind the rural ones alone.** An average rural PHC covers 35,602 people, against a norm of 30,000 in the plains and 20,000 in hilly and tribal areas; an urban PHC is planned for 50,000 (same report, pp. 28 and 125; [IPHS 2022](https://nhm.gov.in/images/pdf/guidelines/iphs/iphs-revised-guidlines-2022/03_PHC_IPHS_Guidelines-2022.pdf), Vol. III, p. 7).
+- **Shelves are often short.** Studies put the share of essential medicines in stock at PHCs at 72-74% in a district of Puducherry ([Meena et al. 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8654139/)) and one of Karnataka ([Tejesh & Nagaveni 2023](https://pmc.ncbi.nlm.nih.gov/articles/PMC10292169/)), and at about 48-51% across Punjab and Haryana ([Prinja et al. 2015](https://pmc.ncbi.nlm.nih.gov/articles/PMC4690305/)).
+- **A short shelf costs the patient.** When the PHC has none, the patient buys it outside or goes without. Medicines are about 42% of what Indian households pay for health out of pocket: ₹1.61 lakh crore of ₹3.83 lakh crore in 2022-23. That is our sum of prescribed and over-the-counter medicines in the [National Health Accounts 2022-23](https://nhsrcindia.org/sites/default/files/2026-05/NHA%202022-23%20Report.pdf), Table A.3, and a floor, because medicines bought during a hospital stay count as inpatient care.
+
+Anumaan asks PHC staff for no new data entry, so it can reach every PHC whose diagnoses and dispensing are already digital. Each state runs its own copy, so it grows a state at a time without pooling patient records, and the nightly compute for all 31,882 PHCs is about $1.7 a month (see Scale below).
+
 ## How it works
 
 1. **Compile the guidelines.** Gemini reads ICMR Standard Treatment Workflows and national programme guidelines (NHSRC, NPCDCS, Anemia Mukt Bharat). It writes a cited *care-to-resource grammar*: for each diagnosis, the medicine course it should consume, the permitted substitutes, and the page it came from. A second Gemini pass drops any rule the PDF does not support. The demo runs on the grammar Gemini compiled from six official PDFs. See `grammar/compile_crg.py`.
@@ -64,16 +73,18 @@ What we are **not** claiming overall:
 
 - **The shadow stock is only as good as its first balance and the slips.** It starts from the register's opening balance, so an overstated opening delays the first warning until the care shows an empty shelf and resets it. A shelf count at go-live fixes that. A PHC that dispenses without writing slips would fool it.
 - **"Where it broke" needs the warehouse ledger.** The simulator's ledger is cleaner than a real DVDMS feed: late and lossy, but otherwise exact. A state without one gets only "at this PHC" or "demand surge". The scorer counts a stock-out during an upstream failure as that failure even when its own warehouse still had stock; the ledger sees those failures because the indents stop being filled.
-- **The simulator is kinder than reality.** Its shelves are stocked 98-99% of the time, while Indian PHC surveys report 72-75%.
-- **Nothing has been validated on real data yet.** A pilot would check against real signals first, such as HMIS "discharged under 48 hours", state drug-availability dashboards and DVDMS warehouse records.
+- **The simulator is kinder than reality.** Its shelves are stocked 98-99% of the time, while studies of Indian PHCs find 48-74% of essential medicines in stock (see Who benefits).
+- **Nothing has been validated on real data yet.** A pilot would check against real signals first, such as HMIS "discharged under 48 hours", state drug-availability dashboards and DVDMS warehouse records. [Pilot in four weeks](#pilot-in-four-weeks) sets out how.
 
 ## Run it
 
 ```bash
 pip install -e ".[app,gemini,dev]"                 # numpy, ortools, fastapi, uvicorn, google-genai, pytest
-python -m pytest -q                               # 26 checks, incl. held-out end-to-end runs and the app
+python -m pytest -q                               # 28 checks, incl. held-out end-to-end runs and the app
 python -m anumaan.evaluate --seeds 5-9            # detection table; also --behaviour alt, --ration 0
 python -m uvicorn app.main:app --port 8788        # demo at http://127.0.0.1:8788
+python -m anumaan.feeds export sample/            # the synthetic network as the CSV files a state would export
+python -m anumaan.feeds run sample/               # the day's alarms and where each broke, from those files
 ```
 
 Live demo: <https://anumaan-336541806157.asia-south1.run.app> (Cloud Run, Mumbai). It scales to zero, so the first visit after a quiet spell is slower.
@@ -112,6 +123,30 @@ To deploy your own copy:
 5. The federation on BigQuery: `bash deploy/national.sh` once, then `python -m anumaan.cleanroom onboard S0` and `onboard S1` (one command per state; in production each state runs it in its own project with `--project`), then `python -m anumaan.cleanroom proof`.
 6. Optional cloud checks: `python -m anumaan.forecast --bigquery anumaan-c4c.anumaan_forecast` backtests TimesFM, and `python -m anumaan.planner --seeds 5-9 --fetch-routes` refreshes the road times (needs the Routes API enabled).
 
+## Pilot in four weeks
+
+A pilot runs on what a state already records; PHC staff get no new app to fill in. `anumaan/feeds.py` reads those records as one CSV file per feed and runs the demo's pipeline on them (`python -m anumaan.feeds --help` lists the columns). Exported to CSV and read back, seed 5 gives exactly the demo's alarms and "where it broke" labels, and `tests/test_feeds.py` keeps it that way.
+
+| Feed | Where it lives today | Needed |
+|---|---|---|
+| PHCs, with their district warehouse and state | The state's facility list | Yes |
+| Diagnoses per PHC per day | The OPD register, digitised where the PHC runs a hospital information system | Yes |
+| Dispensing slips (medicine, days, units per prescription) | The state's drug distribution system (DVDMS or e-Aushadhi) where the PHC issues through it, otherwise the pharmacy's prescription register | Yes |
+| Stock register and receipts | The PHC store's stock book, in the same system | Yes; a shelf count on day one where there is none |
+| "Not available" slips | Pharmacy notes | Optional |
+| Warehouse indents and what arrived | DVDMS at the district warehouse | Optional; without it "where it broke" is only "at this PHC" or "demand surge" |
+
+The hard requirement is digital diagnoses and dispensing. A PHC still on paper registers can use the shelf check (buttons or voice) but not the inference, so a pilot starts in a district where both are already digital.
+
+| Week | What happens | Who |
+|---|---|---|
+| 1 | Pick the district. Map the state's drug and diagnosis codes to the grammar's ids, and recompile the grammar from the state's own treatment guidelines if they differ (one `compile_crg.py` run). Stand up the state's own project: `deploy/deploy.sh`, then `cleanroom onboard <state>` | State IT cell, with us |
+| 2 | Load at least 30 days of history: the filter learns each register's trust and each PHC's prescribing rate from the first 30. A shelf count at every PHC gives the shadow stock a true opening balance | District pharmacist |
+| 3 | Shadow mode: `feeds run` every night, with alarms going to the pilot team only. The PHC pharmacist checks each alarm at the shelf, by button or voice, which gives the first real labels | PHC pharmacists |
+| 4 | Score the alarms against those checks and the state's drug-availability dashboard, and set the alarm threshold for the district. Then switch on the district officer's brief and transfer approvals | District officer, state |
+
+The pilot reports three numbers: the share of alarms the shelf confirmed, the stock-outs the shelf found with no alarm, and how many days ahead the alarms came. A second state repeats the four weeks in its own project and joins the national view with one `onboard`.
+
 ## Layout
 
 | Path | What |
@@ -125,6 +160,7 @@ To deploy your own copy:
 | `anumaan/federation.py` | State nodes, the clean-room gate, the national view and shared priors |
 | `anumaan/cleanroom.py`, `deploy/national.sh` | The same boundary on BigQuery: a private dataset per state, a shared view, a national service account; `onboard` adds a state |
 | `anumaan/scale.py` | Load test of one large state, and the arithmetic for all of India |
+| `anumaan/feeds.py` | A state's CSV exports in, the day's alarms and where each broke out; `export` writes the synthetic network in the same format |
 | `anumaan/voice.py` | Gemini voice shelf check with a safe fallback, and the district officer's brief |
 | `anumaan/sim.py`, `anumaan/evaluate.py` | SYNTHETIC network with injected failures and a DVDMS-style warehouse ledger; held-out scoring against fair baselines |
 | `grammar/` | Gemini grammar compiler; `crg/compiled.json`, which the demo runs on, is compiled from the official PDFs listed in `sources/urls.txt`; `crg/tracer.json` is the **hand-written seed** that gives the compiler its condition and drug names |

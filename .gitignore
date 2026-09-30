@@ -7,3 +7,4 @@ __pycache__/
 .remember/
 node_modules/
 grammar/sources/*.pdf
+sample/
