@@ -1,8 +1,10 @@
 import json
+import socket
+from types import SimpleNamespace
 
 import numpy as np
 
-from anumaan import crg as G, planner as PL, sim
+from anumaan import crg as G, planner as PL, scenario, sim
 
 
 def test_plan_takes_nearest_safe_surplus_and_escalates_state_failures():
@@ -69,3 +71,48 @@ def test_cached_road_times_apply_to_their_own_map_only(tmp_path, monkeypatch):
         assert PL.travel_minutes(c + 0.01)[0, 1] > 20               # any other map: straight line only
     finally:
         PL._road_maps.cache_clear()
+
+
+def test_fetch_asks_a_named_map_for_same_state_pairs_only(tmp_path, monkeypatch):
+    import google.auth
+    from google.auth.transport import requests as gar
+    c = np.array([[10.0, 76.0], [10.0, 76.1], [10.1, 76.0]])
+    same = np.array([[1, 1, 0], [1, 1, 0], [0, 0, 1]], bool)      # the third point is in another state
+    asked = []
+
+    def post(url, **kw):
+        asked.append(len(kw["json"]["destinations"]))
+        return SimpleNamespace(status_code=200, raise_for_status=lambda: None, json=lambda: [
+            {"destinationIndex": 0, "condition": "ROUTE_EXISTS", "duration": "600s", "distanceMeters": 9000}])
+    monkeypatch.setattr(google.auth, "default", lambda scopes: (None, None))
+    monkeypatch.setattr(gar, "AuthorizedSession", lambda creds: SimpleNamespace(post=post))
+    (f := tmp_path / "road.json").write_text(json.dumps({"maps": {"5": {"coords": [[1.0, 2.0]], "arcs": []}}}))
+    monkeypatch.setattr(PL, "ROAD_MINUTES", f)
+    PL._road_maps.cache_clear()
+    try:
+        PL.fetch_road_minutes(maps={"k": (c, same)})
+        PL.fetch_road_minutes(maps={"k": (c, same)})                # held already: asks nothing
+        maps = json.loads(f.read_text())["maps"]
+        assert asked == [1, 1] and maps["5"] == {"coords": [[1.0, 2.0]], "arcs": []}
+        assert {k: maps["k"][k] for k in ("elements", "no_route", "arcs")} == dict(
+            elements=2, no_route=0, arcs=[[0, 1, 600, 9000], [1, 0, 600, 9000]])
+        assert PL.travel_minutes(c)[1, 0] == 10
+    finally:
+        PL._road_maps.cache_clear()
+
+
+def test_kerala_sites_are_real_and_their_road_times_are_cached(monkeypatch):
+    s = json.loads(PL.ROAD_MINUTES.with_name("kerala_phcs.json").read_text(encoding="utf-8"))["sites"]
+    assert [x["district"] for x in s] == [d for d, _, _ in scenario.KERALA for _ in range(scenario.PHCS)]
+    assert len({(x["osm_type"], x["osm_id"]) for x in s}) == len({(x["lat"], x["lon"]) for x in s}) == 70
+    c = np.array([[x["lat"], x["lon"]] for x in s])
+    kerala = json.loads(PL.ROAD_MINUTES.read_text())["maps"]["kerala"]
+    a = np.array(kerala["arcs"])
+    assert kerala["elements"] == 70 * 69 == len(a) + kerala["no_route"]        # one state: every pair but itself
+
+    def offline(*_):
+        raise AssertionError("travel_minutes went to the network")
+    monkeypatch.setattr(socket.socket, "connect", offline)
+    PL._road_maps.cache_clear()
+    m = PL.travel_minutes(c)
+    assert len(a) and (m[a[:, 0], a[:, 1]] == a[:, 2] / 60).all()

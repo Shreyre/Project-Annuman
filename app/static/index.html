@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Anumaan reads medicine stock-outs from the care already being recorded, where the stock register hides them. Synthetic network demonstration.">
-<title>Overview | Anumaan</title>
+<title>Command center | Anumaan</title>
 <meta property="og:title" content="Anumaan">
 <meta property="og:description" content="The register says it’s on the shelf. The care says otherwise. Hidden medicine stock-outs, read from the care already being recorded.">
 <meta property="og:type" content="website">
@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Odia:wght@500;600&family=Kalam:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body class="intro">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -32,12 +32,13 @@
 </svg></div>
 
 <header class="top">
-  <a class="brand" href="#overview" aria-label="Anumaan, overview">
+  <a class="brand" href="#command" aria-label="Anumaan, command center">
     <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M8 11h16M8 16h16M8 21h10"/><path class="cut" d="M6 24 26 8"/></svg>
     <span>Anumaan</span>
   </a>
   <nav class="tabs" aria-label="Main navigation">
-    <a href="#overview" data-view="overview" aria-current="page">Overview</a>
+    <a href="#command" data-view="command" aria-current="page">Command center</a>
+    <a href="#overview" data-view="overview">Stock signals</a>
     <a href="#transfers" data-view="transfers">Redistribution <span id="moveCount" class="count">…</span></a>
     <a href="#care" data-view="care">Beds &amp; staff <span id="careCount" class="count">…</span></a>
     <a href="#national-view" data-view="national-view">National view</a>
@@ -52,22 +53,41 @@
 <main id="main" tabindex="-1">
   <section class="replay" aria-label="Replay controls">
     <button id="play" class="play" type="button" aria-pressed="false" disabled><svg aria-hidden="true"><use class="i-play" href="#i-play"/><use class="i-pause" href="#i-pause"/></svg><span>Play</span></button>
-    <label class="day" for="day">Day <output id="dayOut">…</output><span class="of">of <span id="dayMax">199</span></span></label>
+    <label class="day" for="day"><span id="replayLabel" class="replay-label">Simulation replay</span> Day <output id="dayOut">…</output><span class="of">of <span id="dayMax">199</span></span></label>
     <span class="range"><span class="range-fill" aria-hidden="true"></span><span class="range-thumb" aria-hidden="true"></span><input id="day" type="range" min="0" max="199" value="0" disabled></span>
-    <label class="switch"><input id="truth" type="checkbox" role="switch" disabled><span class="track" aria-hidden="true"></span>Ground truth</label>
+    <label class="switch"><input id="truth" type="checkbox" role="switch" disabled><span class="track" aria-hidden="true"></span>Show what the simulator hid</label>
   </section>
 
   <div class="page-heading">
-    <div><h1 id="pageTitle">Network overview</h1><p id="pageDescription">The register says it’s on the shelf. The care says otherwise.</p></div>
+    <div><h1 id="pageTitle">District command center</h1><p class="who">For district health officers: finds medicines that have run out even when the stock register says they haven’t</p><p id="pageDescription"></p>
+      <p class="post-note"><span class="tag post">Demo-day build</span> It adds work done after the 30 Sep 2026 submission (commit 1d51118); the README’s “After the submission” lists what.</p></div>
     <div class="scope">
-      <div id="netSwitch" class="segmented" role="group" aria-label="Network"><button type="button" data-net="demo" aria-pressed="true">Demo network</button><button type="button" data-net="kerala" aria-pressed="false">Kerala replay</button><button type="button" data-net="live" aria-pressed="false">Live feed</button></div>
+      <div id="netSwitch" class="segmented" role="group" aria-label="Network"><button type="button" data-net="demo" aria-pressed="true">Demo network</button><button type="button" data-net="kerala" aria-pressed="false">Kerala replay</button><button type="button" data-net="live" aria-pressed="false">Live feed</button><button type="button" data-net="whatif" aria-pressed="false" aria-haspopup="dialog">What if…</button></div>
       <span id="networkSize" class="scope-label">Connecting to the network…</span>
+      <span class="tag post">What if…: added after the 30 Sep submission</span>
     </div>
   </div>
+  <div class="stack-row"><span id="stackLabel" class="stack-label">Built with Google</span><span class="tag post">Added after the 30 Sep submission</span><ul id="stack" class="stack" aria-labelledby="stackLabel"></ul></div>
   <div id="loadError" class="error-banner" role="alert" hidden><span></span><button id="retry" class="button" type="button">Try again</button></div>
   <div id="context" class="context" hidden></div>
 
-  <section id="overview" class="view" aria-label="Network overview">
+  <section id="command" class="view" aria-label="District command center">
+    <div class="command">
+      <section class="panel cc" aria-labelledby="ccTitle">
+        <div class="panel-heading">
+          <div><h2 id="ccTitle">Today in the district</h2><p id="ccSub">Loading the district…</p></div>
+          <label class="picker"><span>District</span><select id="district" disabled><option>Loading…</option></select></label>
+        </div>
+        <div id="ccBody" aria-busy="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      </section>
+      <section class="panel cc-map" aria-labelledby="mapTitle">
+        <div class="panel-heading"><div><h2 id="mapTitle">Map</h2><p>PHCs by shelf status; arrows are today’s transfers in.</p></div><span class="map-tags"><span id="mapTag" class="tag">Synthetic PHC locations</span><span id="mapPost" class="tag post" hidden>Added after the 30 Sep submission</span></span></div>
+        <div id="ccMap" class="map-body"><div class="skeleton"></div></div>
+      </section>
+    </div>
+  </section>
+
+  <section id="overview" class="view" hidden aria-label="Network overview">
     <div class="metrics" id="legend" role="group" aria-label="Medicine availability. Select one to filter the list.">
       <button type="button" class="metric priority" data-status="phantom" aria-pressed="false"><span class="metric-label"><i class="sw out phantom"></i>Hidden stock-outs</span><strong data-k="phantom">…</strong><span class="metric-note">Register shows stock, care says empty</span></button>
       <button type="button" class="metric" data-status="OUT" aria-pressed="false"><span class="metric-label"><i class="sw out"></i>Empty shelves</span><strong data-k="out">…</strong><span class="metric-note">Including hidden stock-outs</span></button>
@@ -118,12 +138,23 @@
     <div class="panel-heading"><div><h2 id="natTitle">What the national view sees</h2><p>Supply patterns across state lines, without moving any care record.</p></div><span class="tag">Counts only</span></div>
     <p class="section-note">Diagnoses and slips stay inside each state. Only district and medicine counts are shared, and any group of fewer than five PHCs is suppressed.</p>
     <div id="national" class="rail-body"></div>
+    <section class="rail-body rollout" aria-labelledby="rolloutTitle">
+      <h3 id="rolloutTitle">Rolling it out <span class="tag post">Added after the 30 Sep submission</span></h3>
+      <ul class="rollout-grid">
+        <li><strong>One command per state</strong><span>A state joins the national view with one command, <code>cleanroom onboard &lt;state&gt;</code>, run in its own Google Cloud project. Its care records stay there; only the counts above are shared.</span></li>
+        <li><strong>About $1.7 a month in total, for all of India’s PHCs</strong><span>Nightly compute for all 31,882 PHCs (MoHFW, 2023) and 25 tracer medicines: about 52 vCPU-minutes a night on Cloud Run. Compute only: taking in the feeds, storage and serving are not counted.</span></li>
+        <li><strong>A four-week pilot on existing feeds</strong><span>It runs on what a state already records: diagnoses, dispensing and the stock register. PHC staff get no new app. Week 1 set up, week 2 load history, week 3 shadow mode with shelf checks, week 4 score the alarms and switch on.</span></li>
+        <li><strong>Shared priors for a new state</strong><span>A new state starts from the national medians under “What states get back” above, instead of waiting a month to learn its own.</span></li>
+      </ul>
+      <p class="note">From the README: the cost is scaled up from a synthetic state of 1,500 PHCs timed on one laptop core; the pilot plan is its “Pilot in four weeks”.</p>
+    </section>
   </section>
   <section id="validation" class="view panel rail" hidden aria-labelledby="proofTitle">
     <div class="panel-heading"><div><h2 id="proofTitle">How well it works</h2><p>Anumaan against the register and dispensing baselines.</p></div><span class="tag">Synthetic evaluation</span></div>
     <p class="section-note">Scored against the simulator’s hidden ground truth on a held-out seed. A catch is an alarm up to three weeks before the shelf empties. Not yet validated on real patient data.</p>
-    <div class="rail-body"><div class="scroll"><table id="proof" class="data proof"></table></div><p id="dayNote" class="note"></p><p id="triageNote" class="note"></p>
-      <div id="real" hidden><h3>A first check on real data</h3><div id="realBody"></div></div></div>
+    <div class="rail-body"><p id="takeaway" class="takeaway"></p><div class="scroll"><table id="proof" class="data proof"></table></div><p id="dayNote" class="note"></p><p id="triageNote" class="note"></p><p id="bench" class="note bench" hidden></p>
+      <div id="real" hidden><h3>A first check on real data</h3><div id="realBody"></div></div>
+      <div id="india" hidden><h3>A first check on Indian data (HMIS, district-month) <span class="tag post">Added after the 30 Sep submission</span></h3><div id="indiaBody"></div></div></div>
   </section>
 
   <footer class="foot"><span class="footer-brand">Anumaan is a synthetic replay, not a live clinical or inventory system.</span><p id="grammarNote"></p></footer>
@@ -138,10 +169,46 @@
     <li><strong>Read the evidence</strong><span>Compare the register with the care, the forecast, beds and staff.</span></li>
     <li><strong>Confirm and act</strong><span>Record the pharmacist’s shelf check, then approve transfers or escalate.</span></li>
   </ol>
-  <p class="note">A synthetic replay of 200 days. Turn on ground truth to see what the simulator hid.</p>
+  <p id="guideNote" class="note">A synthetic replay. Turn on “Show what the simulator hid” to see the shelves it kept from Anumaan.</p>
   <button id="startExploring" class="button primary" type="button">Explore the network</button>
 </dialog>
+<dialog id="svc" aria-labelledby="svcTitle">
+  <div class="dialog-heading"><span class="dialog-kicker">Built with Google</span><button id="closeSvc" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <h2 id="svcTitle">Google service</h2>
+  <div id="svcBody"></div>
+</dialog>
+<dialog id="whatif" class="form-dialog" aria-labelledby="whatifTitle">
+  <div class="dialog-heading"><span class="dialog-kicker">What if…</span><button id="closeWhatif" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <h2 id="whatifTitle">Play out an event, and see when Anumaan calls it</h2>
+  <p class="label-line"><span class="tag">What-if on synthetic records: not a forecast and not a test set</span> <span class="tag post">Added after the 30 Sep submission</span></p>
+  <p>Pick an event. The simulator plays it out on a synthetic network, and Anumaan reads that network as it reads any other: day by day, from the care recorded.</p>
+  <div id="whatifPicks" hidden><h3>Ready-made</h3><ul id="whatifMenu" class="wi-menu"></ul></div>
+  <form id="whatifForm" class="wi-form" hidden>
+    <h3>Or build your own</h3>
+    <fieldset class="field wi-world"><legend>Network</legend>
+      <label><input type="radio" name="world" value="kerala" checked> Kerala replay <small data-districts="kerala"></small></label>
+      <label><input type="radio" name="world" value="demo"> Demo network <small data-districts="demo"></small></label></fieldset>
+    <label class="field"><span>Event</span><select name="event"><option value="warehouse">A district warehouse runs out of a medicine</option><option value="state">The state stops supplying a medicine (State 1 in the demo network)</option><option value="emergency">A health emergency in a district</option></select></label>
+    <label class="field"><span>District</span><select name="district"></select></label>
+    <label class="field"><span>Medicine</span><select name="medicine"></select></label>
+    <label class="field"><span>Fever and acute diarrhoea diagnoses in the district, for 28 days, multiplied by</span><select name="lift"></select></label>
+    <label class="field"><span>Day it starts</span><input name="day" type="number" value="40" required aria-describedby="wiDayHint"></label>
+    <p id="wiDayHint" class="note"></p>
+    <button type="submit" class="button primary">Build this world</button>
+  </form>
+  <p id="whatifSay" class="ik-say" role="status"></p>
+</dialog>
+<dialog id="intake" class="form-dialog wide" aria-labelledby="intakeTitle">
+  <div class="dialog-heading"><span class="dialog-kicker">Paper PHC</span><button id="closeIntake" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <h2 id="intakeTitle">Add a day from a paper PHC’s registers</h2>
+  <p class="label-line"><span class="tag post">Added after the 30 Sep submission</span></p>
+  <p>A PHC with no computer can still be read. Photograph one day’s OPD register and dispensing register. Gemini reads the pages into the same report a digital PHC sends, and you check it line by line.</p>
+  <p class="apply-note"><strong>Nothing is applied until you confirm.</strong></p>
+  <p class="note">Read test on 8 held-out synthetic PHC-days: Gemini read 650 of 650 register lines right and missed no row. The pages were drawn in a handwriting font, not photographed from real registers; real registers are not tested yet.</p>
+  <p class="note"><strong>Demo only:</strong> use the sample pages or other synthetic pages. Do not upload real registers: photos with patients’ names on them would go to Gemini at Vertex AI’s global location, not an India-region endpoint.</p>
+  <div id="intakeBody"></div>
+</dialog>
 <div id="tip" class="tip" aria-hidden="true" hidden></div><div id="toast" class="toast" role="status" hidden></div>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

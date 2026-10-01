@@ -1,0 +1,757 @@
+{
+  "what": "Pre-registered re-test of zero-shot TimesFM (BigQuery AI.FORECAST) as Anumaan's 14-day demand forecast. All data SYNTHETIC (anumaan.sim), scored against the simulator's GROUND TRUTH true_use.",
+  "rules": {
+    "written_at": "2026-09-30T20:22:21Z",
+    "status": "Written before any query of this re-test ran. Results are added below it; this block is not edited afterwards.",
+    "model": "'TimesFM 2.5' in BigQuery AI.FORECAST (GA; the default model in the AI.FORECAST reference updated 2026-09-29): zero-shot, univariate, no covariates. Project anumaan-c4c, dataset anumaan_forecast, asia-south1.",
+    "setup": "anumaan.forecast.evaluate_forecast as it stands: sim.simulate(seed) with behaviour 'default' (36 PHCs x 7 conditions x 200 days); origins every 14 days from day 45 (11 per seed); each origin's series cut at day <= origin; 14-day horizon; forecast diagnoses x the grammar's units per diagnosis = 14-day demand per PHC x primary drug.",
+    "score": "All-cells WAPE per seed: sum |forecast - true_use| / sum true_use over every origin x PHC x primary drug.",
+    "candidates": {
+      "grain": {
+        "day": "AI.FORECAST on daily diagnosis counts, horizon 14 days.",
+        "week": "AI.FORECAST on weekly totals counted back from each origin (week 0 ends on the origin; the oldest, partial week is dropped), horizon 2 weeks; each week's forecast is spread evenly over its 7 days."
+      },
+      "point": {
+        "q50": "forecast_value (the median), from confidence_level 0.8.",
+        "q55": "prediction_interval_upper_bound from confidence_level 0.1.",
+        "q60": "prediction_interval_upper_bound from confidence_level 0.2.",
+        "qmean": "0.3 x lower + 0.4 x forecast_value + 0.3 x upper, from confidence_level 0.8: the 30/40/30 quantile mean, assuming the 80% bounds are q10 and q90."
+      },
+      "ets_weight": [0, 0.25, 0.5, 0.75],
+      "blend": "forecast = w x ETS + (1 - w) x TimesFM, on the 14-day units after the same CRG step. ETS = the damped-trend ETS already in anumaan/forecast.py (the 'crg' arm; its grid was tuned on seeds 0-4 before this re-test).",
+      "plus": "ETS alone (w = 1).",
+      "count": "2 grains x 4 points x 4 weights + ETS alone = 33"
+    },
+    "selection_queries": "Seeds 0-4 only: 6 queries (day and week x confidence_level 0.8, 0.1, 0.2). q50 and qmean share the 0.8 query; the blends are computed offline.",
+    "criterion": "Mean over seeds 0-4 of the all-cells WAPE, unrounded. Lowest wins.",
+    "ties": "Every candidate within 0.001 of the lowest mean counts as tied, and the simplest tied candidate wins. Simplest first: ETS alone (the incumbent, no cloud call); then TimesFM candidates by their number of departures from day / q50 / w = 0 (weekly grain, a point other than q50, and w > 0 each count 1). Equal simplicity: lower mean WAPE.",
+    "report": "The whole seeds 0-4 table. The winner once on seeds 5-9 and once on seeds 10-14, each against ETS alone on the same seeds (per seed, mean, range). Nothing is re-chosen after seeds 5-9 or 10-14 are seen.",
+    "if_ets_alone_wins": "Say so plainly: TimesFM stays a benchmark.",
+    "information_only": "When the query budget allows, the best TimesFM-alone candidate (w = 0) by the same criterion is also run once on seeds 5-9 and once on 10-14. It cannot change the decision.",
+    "ui": "The forecast endpoint gets a TimesFM line only if the winner is a TimesFM candidate and its mean WAPE is below ETS alone on both seeds 5-9 and seeds 10-14.",
+    "reference": "The plain history mean (the 'crg_mean' arm) is shown for context. It is not a candidate.",
+    "failures": "A query that fails for a mechanical reason (SQL, quota, parsing) may be fixed and re-run within the budget. A candidate that still cannot be scored is reported as missing.",
+    "queries": "At most 10 AI.FORECAST queries in all, each about 10 MB billed (inside the free tier); free dry runs are not counted. Tables dx_synthetic_0_4, dx_synthetic_5_9 and dx_synthetic_10_14 (new, one per seed set). dx_synthetic, which the default --bigquery run writes, is not touched. The raw AI.FORECAST rows are kept locally.",
+    "disclosure": [
+      "On 29 Sep 2026 TimesFM was already scored on seeds 5-9 at day grain: q50 with TimesFM 3.0 (WAPE 0.085-0.093, the README figure) and with TimesFM 2.5 (0.084-0.094), and the 30/40/30 quantile mean (qmean, 0.075-0.082), which was looked at on seeds 5-9 only. Seeds 5-9 are therefore not clean for day-grain q50 and qmean; seeds 10-14 are the clean test.",
+      "Seeds 10-14 have never been used to score a forecast. The only earlier use found in the project's sessions is seed 11 in a start-up timing check of a different network shape (1 state x 14 x 5 PHCs, 120 days).",
+      "The weekly grain and the q55/q60 points were suggested on 1 Oct 2026 by a local stand-in (a median of past counts, not TimesFM) run on seeds 0-4 only.",
+      "The ETS grid was tuned on seeds 0-4, so on seeds 0-4 both sides are in-sample."
+    ]
+  },
+  "results": {
+    "scored_at": "2026-09-30T21:28:20Z",
+    "decision": "The blend 0.75 x ETS + 0.25 x TimesFM (day q55) edged ETS alone on seeds 5-9 and 10-14 (2.0% and 2.7% lower WAPE); TimesFM alone trails, and a plain history mean does about as well or better. By the pre-registered rule the forecast endpoint may show a TimesFM line.",
+    "headline": [
+      "Seeds 0-4 (selection): TimesFM day q55, ETS weight 0.75 0.0675, ETS alone 0.0688.",
+      "Seeds 5-9: TimesFM day q55, ETS weight 0.75 0.0718, ETS alone 0.0733; TimesFM alone (TimesFM day qmean, ETS weight 0) 0.0776.",
+      "Seeds 10-14: TimesFM day q55, ETS weight 0.75 0.0677, ETS alone 0.0696; TimesFM alone (TimesFM day qmean, ETS weight 0) 0.0737."
+    ],
+    "context": "History mean (context, not a candidate): seeds 0-4 0.0666 (lowest candidate 0.0674); seeds 5-9 0.0699; seeds 10-14 0.0677.",
+    "held_out": {
+      "5-9": {
+        "ETS alone": {
+          "wape": [0.072408, 0.072421, 0.073505, 0.073184, 0.075047],
+          "mean": 0.073313,
+          "range": [0.0724, 0.075],
+          "share_of_true_use": 0.9847,
+          "slice_mean_wape": {
+            "after_out": 0.1096,
+            "surge": 0.1566,
+            "calm": 0.0627
+          }
+        },
+        "reference_history_mean": {
+          "wape": [0.071487, 0.069129, 0.068962, 0.067228, 0.072513],
+          "mean": 0.069864,
+          "range": [0.0672, 0.0725],
+          "share_of_true_use": 0.9716,
+          "slice_mean_wape": {
+            "after_out": 0.0944,
+            "surge": 0.205,
+            "calm": 0.0539
+          }
+        },
+        "winner: TimesFM day q55, ETS weight 0.75": {
+          "wape": [0.070648, 0.071288, 0.072189, 0.070999, 0.074082],
+          "mean": 0.071841,
+          "range": [0.0706, 0.0741],
+          "share_of_true_use": 0.9945,
+          "slice_mean_wape": {
+            "after_out": 0.1107,
+            "surge": 0.1522,
+            "calm": 0.0614
+          }
+        },
+        "information_only: TimesFM day qmean, ETS weight 0": {
+          "wape": [0.077443, 0.074522, 0.078566, 0.075499, 0.081941],
+          "mean": 0.077594,
+          "range": [0.0745, 0.0819],
+          "share_of_true_use": 0.9849,
+          "slice_mean_wape": {
+            "after_out": 0.112,
+            "surge": 0.1524,
+            "calm": 0.0677
+          }
+        },
+        "winner_beats_ets": true
+      },
+      "10-14": {
+        "ETS alone": {
+          "wape": [0.071118, 0.0686, 0.069285, 0.070993, 0.068203],
+          "mean": 0.06964,
+          "range": [0.0682, 0.0711],
+          "share_of_true_use": 0.9814,
+          "slice_mean_wape": {
+            "after_out": 0.0996,
+            "surge": 0.1472,
+            "calm": 0.0596
+          }
+        },
+        "reference_history_mean": {
+          "wape": [0.069234, 0.066293, 0.070679, 0.065791, 0.066712],
+          "mean": 0.067742,
+          "range": [0.0658, 0.0707],
+          "share_of_true_use": 0.9724,
+          "slice_mean_wape": {
+            "after_out": 0.0951,
+            "surge": 0.2013,
+            "calm": 0.0513
+          }
+        },
+        "winner: TimesFM day q55, ETS weight 0.75": {
+          "wape": [0.069064, 0.067046, 0.066873, 0.068441, 0.067208],
+          "mean": 0.067726,
+          "range": [0.0669, 0.0691],
+          "share_of_true_use": 0.9917,
+          "slice_mean_wape": {
+            "after_out": 0.1014,
+            "surge": 0.1424,
+            "calm": 0.0578
+          }
+        },
+        "information_only: TimesFM day qmean, ETS weight 0": {
+          "wape": [0.075665, 0.072813, 0.07303, 0.075975, 0.071229],
+          "mean": 0.073742,
+          "range": [0.0712, 0.076],
+          "share_of_true_use": 0.9829,
+          "slice_mean_wape": {
+            "after_out": 0.1025,
+            "surge": 0.1435,
+            "calm": 0.0643
+          }
+        },
+        "winner_beats_ets": true
+      }
+    },
+    "seeds_0_4": {
+      "unit": "all-cells WAPE per seed (seeds 0, 1, 2, 3, 4), their mean (the criterion) and range; share_of_true_use = forecast total / true total, mean over seeds. Sorted by mean. tied = within 0.001 of the lowest mean.",
+      "candidates": [
+        {
+          "candidate": "TimesFM week q55, ETS weight 0.75",
+          "grain": "week",
+          "point": "q55",
+          "ets_weight": 0.75,
+          "simplicity": 4,
+          "wape": [0.067579, 0.065204, 0.06683, 0.068372, 0.069218],
+          "mean": 0.06744,
+          "range": [0.0652, 0.0692],
+          "share_of_true_use": 0.993,
+          "tied": true
+        },
+        {
+          "candidate": "TimesFM day q55, ETS weight 0.75",
+          "grain": "day",
+          "point": "q55",
+          "ets_weight": 0.75,
+          "simplicity": 3,
+          "wape": [0.067616, 0.065153, 0.066531, 0.068354, 0.069639],
+          "mean": 0.067459,
+          "range": [0.0652, 0.0696],
+          "share_of_true_use": 0.9966,
+          "tied": true
+        },
+        {
+          "candidate": "TimesFM week q60, ETS weight 0.75",
+          "grain": "week",
+          "point": "q60",
+          "ets_weight": 0.75,
+          "simplicity": 4,
+          "wape": [0.067769, 0.065118, 0.066986, 0.068861, 0.069235],
+          "mean": 0.067594,
+          "range": [0.0651, 0.0692],
+          "share_of_true_use": 0.9999,
+          "tied": true
+        },
+        {
+          "candidate": "TimesFM day qmean, ETS weight 0.75",
+          "grain": "day",
+          "point": "qmean",
+          "ets_weight": 0.75,
+          "simplicity": 3,
+          "wape": [0.067571, 0.066027, 0.06713, 0.06825, 0.069834],
+          "mean": 0.067763,
+          "range": [0.066, 0.0698],
+          "share_of_true_use": 0.9869,
+          "tied": true
+        },
+        {
+          "candidate": "TimesFM week qmean, ETS weight 0.75",
+          "grain": "week",
+          "point": "qmean",
+          "ets_weight": 0.75,
+          "simplicity": 4,
+          "wape": [0.067844, 0.066162, 0.067062, 0.068191, 0.070204],
+          "mean": 0.067893,
+          "range": [0.0662, 0.0702],
+          "share_of_true_use": 0.9867,
+          "tied": true
+        },
+        {
+          "candidate": "TimesFM week q50, ETS weight 0.75",
+          "grain": "week",
+          "point": "q50",
+          "ets_weight": 0.75,
+          "simplicity": 3,
+          "wape": [0.067959, 0.065897, 0.067203, 0.068495, 0.069924],
+          "mean": 0.067896,
+          "range": [0.0659, 0.0699],
+          "share_of_true_use": 0.9862,
+          "tied": true
+        },
+        {
+          "candidate": "TimesFM day qmean, ETS weight 0.5",
+          "grain": "day",
+          "point": "qmean",
+          "ets_weight": 0.5,
+          "simplicity": 3,
+          "wape": [0.06761, 0.066403, 0.067788, 0.06829, 0.070246],
+          "mean": 0.068067,
+          "range": [0.0664, 0.0702],
+          "share_of_true_use": 0.9872,
+          "tied": true
+        },
+        {
+          "candidate": "TimesFM week q55, ETS weight 0.5",
+          "grain": "week",
+          "point": "q55",
+          "ets_weight": 0.5,
+          "simplicity": 4,
+          "wape": [0.069038, 0.066237, 0.068249, 0.06989, 0.070599],
+          "mean": 0.068803,
+          "range": [0.0662, 0.0706],
+          "share_of_true_use": 0.9995,
+          "tied": false
+        },
+        {
+          "candidate": "ETS alone",
+          "grain": null,
+          "point": null,
+          "ets_weight": 1,
+          "simplicity": 0,
+          "wape": [0.068987, 0.066999, 0.067988, 0.069532, 0.070659],
+          "mean": 0.068833,
+          "range": [0.067, 0.0707],
+          "share_of_true_use": 0.9865,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week qmean, ETS weight 0.5",
+          "grain": "week",
+          "point": "qmean",
+          "ets_weight": 0.5,
+          "simplicity": 4,
+          "wape": [0.068862, 0.06712, 0.068007, 0.068607, 0.071627],
+          "mean": 0.068845,
+          "range": [0.0671, 0.0716],
+          "share_of_true_use": 0.9868,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q50, ETS weight 0.5",
+          "grain": "week",
+          "point": "q50",
+          "ets_weight": 0.5,
+          "simplicity": 3,
+          "wape": [0.069236, 0.066773, 0.068427, 0.069364, 0.071281],
+          "mean": 0.069016,
+          "range": [0.0668, 0.0713],
+          "share_of_true_use": 0.986,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q50, ETS weight 0.75",
+          "grain": "day",
+          "point": "q50",
+          "ets_weight": 0.75,
+          "simplicity": 2,
+          "wape": [0.069289, 0.067487, 0.067859, 0.06949, 0.071815],
+          "mean": 0.069188,
+          "range": [0.0675, 0.0718],
+          "share_of_true_use": 0.9797,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q55, ETS weight 0.5",
+          "grain": "day",
+          "point": "q55",
+          "ets_weight": 0.5,
+          "simplicity": 3,
+          "wape": [0.069782, 0.066766, 0.068392, 0.070313, 0.071424],
+          "mean": 0.069336,
+          "range": [0.0668, 0.0714],
+          "share_of_true_use": 1.0066,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q60, ETS weight 0.75",
+          "grain": "day",
+          "point": "q60",
+          "ets_weight": 0.75,
+          "simplicity": 3,
+          "wape": [0.069885, 0.066733, 0.069217, 0.07079, 0.07143],
+          "mean": 0.069611,
+          "range": [0.0667, 0.0714],
+          "share_of_true_use": 1.0137,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day qmean, ETS weight 0.25",
+          "grain": "day",
+          "point": "qmean",
+          "ets_weight": 0.25,
+          "simplicity": 3,
+          "wape": [0.068988, 0.067917, 0.069807, 0.069596, 0.071755],
+          "mean": 0.069613,
+          "range": [0.0679, 0.0718],
+          "share_of_true_use": 0.9876,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q60, ETS weight 0.5",
+          "grain": "week",
+          "point": "q60",
+          "ets_weight": 0.5,
+          "simplicity": 4,
+          "wape": [0.071176, 0.067755, 0.070312, 0.072671, 0.072326],
+          "mean": 0.070848,
+          "range": [0.0678, 0.0727],
+          "share_of_true_use": 1.0132,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week qmean, ETS weight 0.25",
+          "grain": "week",
+          "point": "qmean",
+          "ets_weight": 0.25,
+          "simplicity": 4,
+          "wape": [0.072011, 0.069573, 0.0704, 0.070718, 0.074508],
+          "mean": 0.071442,
+          "range": [0.0696, 0.0745],
+          "share_of_true_use": 0.987,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q50, ETS weight 0.25",
+          "grain": "week",
+          "point": "q50",
+          "ets_weight": 0.25,
+          "simplicity": 3,
+          "wape": [0.072737, 0.06938, 0.07129, 0.071948, 0.074344],
+          "mean": 0.07194,
+          "range": [0.0694, 0.0743],
+          "share_of_true_use": 0.9857,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q50, ETS weight 0.5",
+          "grain": "day",
+          "point": "q50",
+          "ets_weight": 0.5,
+          "simplicity": 2,
+          "wape": [0.071804, 0.07025, 0.070577, 0.071903, 0.075171],
+          "mean": 0.071941,
+          "range": [0.0702, 0.0752],
+          "share_of_true_use": 0.9729,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day qmean, ETS weight 0",
+          "grain": "day",
+          "point": "qmean",
+          "ets_weight": 0,
+          "simplicity": 2,
+          "wape": [0.071584, 0.070282, 0.072838, 0.072172, 0.074087],
+          "mean": 0.072193,
+          "range": [0.0703, 0.0741],
+          "share_of_true_use": 0.9879,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q55, ETS weight 0.25",
+          "grain": "week",
+          "point": "q55",
+          "ets_weight": 0.25,
+          "simplicity": 4,
+          "wape": [0.073132, 0.06938, 0.071761, 0.073639, 0.074116],
+          "mean": 0.072406,
+          "range": [0.0694, 0.0741],
+          "share_of_true_use": 1.006,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q55, ETS weight 0.25",
+          "grain": "day",
+          "point": "q55",
+          "ets_weight": 0.25,
+          "simplicity": 3,
+          "wape": [0.074956, 0.071113, 0.072887, 0.075165, 0.075584],
+          "mean": 0.073941,
+          "range": [0.0711, 0.0756],
+          "share_of_true_use": 1.0167,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week qmean, ETS weight 0",
+          "grain": "week",
+          "point": "qmean",
+          "ets_weight": 0,
+          "simplicity": 3,
+          "wape": [0.07658, 0.073306, 0.074339, 0.074414, 0.078559],
+          "mean": 0.07544,
+          "range": [0.0733, 0.0786],
+          "share_of_true_use": 0.9871,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q50, ETS weight 0",
+          "grain": "week",
+          "point": "q50",
+          "ets_weight": 0,
+          "simplicity": 2,
+          "wape": [0.077683, 0.073227, 0.075954, 0.076135, 0.078758],
+          "mean": 0.076351,
+          "range": [0.0732, 0.0788],
+          "share_of_true_use": 0.9854,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q50, ETS weight 0.25",
+          "grain": "day",
+          "point": "q50",
+          "ets_weight": 0.25,
+          "simplicity": 2,
+          "wape": [0.076197, 0.07441, 0.075558, 0.076419, 0.080164],
+          "mean": 0.076549,
+          "range": [0.0744, 0.0802],
+          "share_of_true_use": 0.9661,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q60, ETS weight 0.25",
+          "grain": "week",
+          "point": "q60",
+          "ets_weight": 0.25,
+          "simplicity": 4,
+          "wape": [0.077991, 0.073521, 0.076713, 0.079895, 0.0786],
+          "mean": 0.077344,
+          "range": [0.0735, 0.0799],
+          "share_of_true_use": 1.0266,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q55, ETS weight 0",
+          "grain": "week",
+          "point": "q55",
+          "ets_weight": 0,
+          "simplicity": 3,
+          "wape": [0.079091, 0.074084, 0.077077, 0.079202, 0.079324],
+          "mean": 0.077756,
+          "range": [0.0741, 0.0793],
+          "share_of_true_use": 1.0125,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q55, ETS weight 0",
+          "grain": "day",
+          "point": "q55",
+          "ets_weight": 0,
+          "simplicity": 2,
+          "wape": [0.082246, 0.077508, 0.079455, 0.082157, 0.081783],
+          "mean": 0.08063,
+          "range": [0.0775, 0.0822],
+          "share_of_true_use": 1.0267,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q60, ETS weight 0.5",
+          "grain": "day",
+          "point": "q60",
+          "ets_weight": 0.5,
+          "simplicity": 3,
+          "wape": [0.081582, 0.077675, 0.080617, 0.082331, 0.08168],
+          "mean": 0.080777,
+          "range": [0.0777, 0.0823],
+          "share_of_true_use": 1.0409,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q50, ETS weight 0",
+          "grain": "day",
+          "point": "q50",
+          "ets_weight": 0,
+          "simplicity": 1,
+          "wape": [0.082071, 0.07949, 0.082029, 0.082363, 0.086422],
+          "mean": 0.082475,
+          "range": [0.0795, 0.0864],
+          "share_of_true_use": 0.9592,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM week q60, ETS weight 0",
+          "grain": "week",
+          "point": "q60",
+          "ets_weight": 0,
+          "simplicity": 3,
+          "wape": [0.08758, 0.081489, 0.085387, 0.089257, 0.087436],
+          "mean": 0.08623,
+          "range": [0.0815, 0.0893],
+          "share_of_true_use": 1.0399,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q60, ETS weight 0.25",
+          "grain": "day",
+          "point": "q60",
+          "ets_weight": 0.25,
+          "simplicity": 3,
+          "wape": [0.100252, 0.094618, 0.098198, 0.100059, 0.098513],
+          "mean": 0.098328,
+          "range": [0.0946, 0.1003],
+          "share_of_true_use": 1.0681,
+          "tied": false
+        },
+        {
+          "candidate": "TimesFM day q60, ETS weight 0",
+          "grain": "day",
+          "point": "q60",
+          "ets_weight": 0,
+          "simplicity": 2,
+          "wape": [0.122957, 0.115519, 0.119546, 0.12145, 0.119203],
+          "mean": 0.119735,
+          "range": [0.1155, 0.123],
+          "share_of_true_use": 1.0953,
+          "tied": false
+        }
+      ],
+      "missing": [],
+      "lowest_mean": 0.06744,
+      "tied": [
+        "TimesFM day q55, ETS weight 0.75",
+        "TimesFM day qmean, ETS weight 0.5",
+        "TimesFM day qmean, ETS weight 0.75",
+        "TimesFM week q50, ETS weight 0.75",
+        "TimesFM week q55, ETS weight 0.75",
+        "TimesFM week q60, ETS weight 0.75",
+        "TimesFM week qmean, ETS weight 0.75"
+      ],
+      "winner": "TimesFM day q55, ETS weight 0.75",
+      "best_timesfm_alone": "TimesFM day qmean, ETS weight 0",
+      "reference_history_mean": {
+        "wape": [0.068532, 0.065268, 0.06358, 0.069681, 0.065802],
+        "mean": 0.066572,
+        "range": [0.0636, 0.0697],
+        "share_of_true_use": 0.9751,
+        "slice_mean_wape": {
+          "after_out": 0.0847,
+          "surge": 0.1996,
+          "calm": 0.0499
+        }
+      }
+    },
+    "checks": {
+      "day": {
+        "median_max_abs_diff_across_confidence_levels": 0.0,
+        "share_rows_lower_le_median_le_upper": {
+          "0.8": 1.0,
+          "0.1": 1.0,
+          "0.2": 1.0
+        },
+        "share_rows_q55_le_q60": 1.0,
+        "share_rows_q60_le_q90": 1.0
+      },
+      "week": {
+        "median_max_abs_diff_across_confidence_levels": 0.0,
+        "share_rows_lower_le_median_le_upper": {
+          "0.8": 0.999964,
+          "0.1": 0.999964,
+          "0.2": 0.999964
+        },
+        "share_rows_q55_le_q60": 1.0,
+        "share_rows_q60_le_q90": 1.0
+      }
+    },
+    "notes": [
+      "A trial run of this scorer at about 20:33Z, after query 1 finished and while query 2 ran, printed ETS-alone and history-mean scores on seeds 10-14 (and part of 5-9) before the seeds 0-4 selection was complete. No TimesFM forecast for those seeds existed then, the ETS is fixed and the selection rule is mechanical, so it could not steer the choice. The scorer now scores held-out seeds only once the seeds 0-4 table is complete.",
+      "The seeds 0-4 selection (winner and table) was written into this file at the scored_at time of an earlier run of this scorer, 2026-09-30T20:53:54Z, before the held-out queries were created (see their job_created times).",
+      "sim.simulate(seed) for seeds 0-14 gives the same dx, true_use, rate, slips and na in this worktree (which holds another task's uncommitted sim.py change) as at commit 1d51118: sha256 f6f3ac0927b3175a729d715dcf42ae6bb050a1d8460b613b7826b983b7d55df7 both, checked before the first query and after the last (<scratchpad>/timesfm/check_sim.py).",
+      "checks.week: in 1 of 27,720 weekly rows (seed 4, PHC 26, condition 0, origin 87, week ending day 101) AI.FORECAST's median lies just below the lower bound of every interval it returned; all daily rows are ordered."
+    ],
+    "queries": [
+      {
+        "role": "selection",
+        "seeds": "0-4",
+        "grain": "week",
+        "confidence_level": 0.8,
+        "table": "dx_synthetic_0_4",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 0-4 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_0_4 --grain week --point q50 --save <scratchpad>/timesfm/rows_week_c0.8_s0-4.json",
+        "rows_file": "<scratchpad>/timesfm/rows_week_c0.8_s0-4.json",
+        "rows": 27720,
+        "job_created": "2026-09-30T20:29:05Z",
+        "seconds": 180,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "selection",
+        "seeds": "0-4",
+        "grain": "week",
+        "confidence_level": 0.1,
+        "table": "dx_synthetic_0_4",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 0-4 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_0_4 --grain week --point q55 --save <scratchpad>/timesfm/rows_week_c0.1_s0-4.json",
+        "rows_file": "<scratchpad>/timesfm/rows_week_c0.1_s0-4.json",
+        "rows": 27720,
+        "job_created": "2026-09-30T20:32:33Z",
+        "seconds": 148,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "selection",
+        "seeds": "0-4",
+        "grain": "week",
+        "confidence_level": 0.2,
+        "table": "dx_synthetic_0_4",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 0-4 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_0_4 --grain week --point q60 --save <scratchpad>/timesfm/rows_week_c0.2_s0-4.json",
+        "rows_file": "<scratchpad>/timesfm/rows_week_c0.2_s0-4.json",
+        "rows": 27720,
+        "job_created": "2026-09-30T20:35:15Z",
+        "seconds": 146,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "selection",
+        "seeds": "0-4",
+        "grain": "day",
+        "confidence_level": 0.8,
+        "table": "dx_synthetic_0_4",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 0-4 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_0_4 --grain day --point q50 --save <scratchpad>/timesfm/rows_day_c0.8_s0-4.json",
+        "rows_file": "<scratchpad>/timesfm/rows_day_c0.8_s0-4.json",
+        "rows": 194040,
+        "job_created": "2026-09-30T20:37:59Z",
+        "seconds": 205,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "selection",
+        "seeds": "0-4",
+        "grain": "day",
+        "confidence_level": 0.1,
+        "table": "dx_synthetic_0_4",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 0-4 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_0_4 --grain day --point q55 --save <scratchpad>/timesfm/rows_day_c0.1_s0-4.json",
+        "rows_file": "<scratchpad>/timesfm/rows_day_c0.1_s0-4.json",
+        "rows": 194040,
+        "job_created": "2026-09-30T20:41:46Z",
+        "seconds": 223,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "selection",
+        "seeds": "0-4",
+        "grain": "day",
+        "confidence_level": 0.2,
+        "table": "dx_synthetic_0_4",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 0-4 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_0_4 --grain day --point q60 --save <scratchpad>/timesfm/rows_day_c0.2_s0-4.json",
+        "rows_file": "<scratchpad>/timesfm/rows_day_c0.2_s0-4.json",
+        "rows": 194040,
+        "job_created": "2026-09-30T20:45:53Z",
+        "seconds": 198,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "winner",
+        "seeds": "5-9",
+        "grain": "day",
+        "confidence_level": 0.1,
+        "table": "dx_synthetic_5_9",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 5-9 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_5_9 --grain day --point q55 --blend 0.75 --save <scratchpad>/timesfm/rows_day_c0.1_s5-9.json",
+        "rows_file": "<scratchpad>/timesfm/rows_day_c0.1_s5-9.json",
+        "rows": 194040,
+        "job_created": "2026-09-30T20:54:27Z",
+        "seconds": 186,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "winner",
+        "seeds": "10-14",
+        "grain": "day",
+        "confidence_level": 0.1,
+        "table": "dx_synthetic_10_14",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 10-14 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_10_14 --grain day --point q55 --blend 0.75 --save <scratchpad>/timesfm/rows_day_c0.1_s10-14.json",
+        "rows_file": "<scratchpad>/timesfm/rows_day_c0.1_s10-14.json",
+        "rows": 194040,
+        "job_created": "2026-09-30T20:57:57Z",
+        "seconds": 228,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "information_only",
+        "seeds": "5-9",
+        "grain": "day",
+        "confidence_level": 0.8,
+        "table": "dx_synthetic_5_9",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 5-9 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_5_9 --grain day --point qmean --save <scratchpad>/timesfm/rows_day_c0.8_s5-9.json",
+        "rows_file": "<scratchpad>/timesfm/rows_day_c0.8_s5-9.json",
+        "rows": 194040,
+        "job_created": "2026-09-30T21:02:27Z",
+        "seconds": 223,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      },
+      {
+        "role": "information_only",
+        "seeds": "10-14",
+        "grain": "day",
+        "confidence_level": 0.8,
+        "table": "dx_synthetic_10_14",
+        "command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 10-14 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_10_14 --grain day --point qmean --save <scratchpad>/timesfm/rows_day_c0.8_s10-14.json",
+        "rows_file": "<scratchpad>/timesfm/rows_day_c0.8_s10-14.json",
+        "rows": 194040,
+        "job_created": "2026-09-30T21:06:33Z",
+        "seconds": 183,
+        "mb_processed": 10.08,
+        "mb_billed": 10.49,
+        "location": "asia-south1"
+      }
+    ],
+    "total_mb_billed": 104.9,
+    "scoring_command": "PYTHONDONTWRITEBYTECODE=1 python <scratchpad>/timesfm/score.py (from the worktree root; re-reads the saved rows through timesfm_forecast(save=...), no BigQuery)",
+    "winner_rescore_command": "PYTHONDONTWRITEBYTECODE=1 python -m anumaan.forecast --seeds 0-4 --bigquery anumaan-c4c.anumaan_forecast --model \"TimesFM 2.5\" --table dx_synthetic_0_4 --grain day --point q55 --blend 0.75 --save <scratchpad>/timesfm/rows_day_c0.1_s0-4.json",
+    "scratchpad": "<scratchpad> above is the author's local working folder; its files are not in the repo"
+  }
+}

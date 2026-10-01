@@ -1,0 +1,569 @@
+{
+ "source": "OpenStreetMap, through the Overpass API. Health facilities: every amenity=clinic|hospital|doctors or healthcare=clinic|hospital|centre|doctor feature inside the Kerala boundary (area ISO3166-2=IN-KL), from overpass.kumi.systems, OSM data as of 2026-07-28. District boundaries: the 14 admin_level=5 district relations, from overpass-api.de, OSM data as of 2026-09-30. lat/lon is the node, or the centre Overpass gives for a way or relation.",
+ "licence": "ODbL 1.0, (c) OpenStreetMap contributors",
+ "fetched": "2026-10-01",
+ "selection_rule": "A Primary or Family Health Centre marked as government by its operator, operator:type or name (AYUSH, sub-centre and unnamed 'Primary Health Centre' features left out); district by point-in-polygon on the OSM district boundaries. Walking these in ascending OSM type and id (nodes, ways, relations), a site is kept unless it lies within 300 m of, or has the same place name as, a site kept already. In each district, the first 5 kept sites that lie at least 500 m from every other Kerala district's boundary (closer is too close to call); districts in anumaan/scenario.py KERALA order.",
+ "note": "Real public PHC/FHC locations from OpenStreetMap; every record is synthetic; names withheld. A name is kept here only for provenance and is never shown in the UI.",
+ "sites": [
+  {
+   "district": "Thiruvananthapuram",
+   "lat": 8.4676474,
+   "lon": 77.0748335,
+   "osm_type": "node",
+   "osm_id": 7130275441,
+   "name": "Family Health Center Maranalloor"
+  },
+  {
+   "district": "Thiruvananthapuram",
+   "lat": 8.4445168,
+   "lon": 76.9541901,
+   "osm_type": "node",
+   "osm_id": 7480586177,
+   "name": "Family Health Centre Thiruvallom"
+  },
+  {
+   "district": "Thiruvananthapuram",
+   "lat": 8.5465615,
+   "lon": 76.9505674,
+   "osm_type": "node",
+   "osm_id": 7481820650,
+   "name": "Primary Health Centre Chettivilakam"
+  },
+  {
+   "district": "Thiruvananthapuram",
+   "lat": 8.5449031,
+   "lon": 76.9078035,
+   "osm_type": "node",
+   "osm_id": 7481862970,
+   "name": "Primary Health Centre Ulloor"
+  },
+  {
+   "district": "Thiruvananthapuram",
+   "lat": 8.6871888,
+   "lon": 76.8657251,
+   "osm_type": "node",
+   "osm_id": 7481956976,
+   "name": "Family Health Centre Mudakkal"
+  },
+  {
+   "district": "Kollam",
+   "lat": 9.0257005,
+   "lon": 76.8499253,
+   "osm_type": "node",
+   "osm_id": 3522971021,
+   "name": "Family Health Centre, Vilakkudy"
+  },
+  {
+   "district": "Kollam",
+   "lat": 8.982502,
+   "lon": 76.9227926,
+   "osm_type": "node",
+   "osm_id": 7458333113,
+   "name": "Primary Health Centre Karavaloor"
+  },
+  {
+   "district": "Kollam",
+   "lat": 8.9983314,
+   "lon": 76.615777,
+   "osm_type": "node",
+   "osm_id": 7475028041,
+   "name": "Primary Health Centre, Munroe Island"
+  },
+  {
+   "district": "Kollam",
+   "lat": 9.0126405,
+   "lon": 76.7291497,
+   "osm_type": "node",
+   "osm_id": 7475241099,
+   "name": "Primary Health Centre , Neduvathur"
+  },
+  {
+   "district": "Kollam",
+   "lat": 8.9710879,
+   "lon": 76.7186779,
+   "osm_type": "node",
+   "osm_id": 7475421946,
+   "name": "Primary Health Center, Ezhukone"
+  },
+  {
+   "district": "Pathanamthitta",
+   "lat": 9.2804939,
+   "lon": 76.9291507,
+   "osm_type": "node",
+   "osm_id": 7482025247,
+   "name": "Family Health Centre, Thannithodu"
+  },
+  {
+   "district": "Pathanamthitta",
+   "lat": 9.1237149,
+   "lon": 76.7277734,
+   "osm_type": "node",
+   "osm_id": 8073348462,
+   "name": "Primary Health Centre Erathu"
+  },
+  {
+   "district": "Pathanamthitta",
+   "lat": 9.4350421,
+   "lon": 76.853625,
+   "osm_type": "node",
+   "osm_id": 8995791012,
+   "name": "Family Health Centre Vachoochira"
+  },
+  {
+   "district": "Pathanamthitta",
+   "lat": 9.3155683,
+   "lon": 76.8249683,
+   "osm_type": "node",
+   "osm_id": 9085259821,
+   "name": "Primary Health Centre Thalachira"
+  },
+  {
+   "district": "Pathanamthitta",
+   "lat": 9.366677,
+   "lon": 76.5451403,
+   "osm_type": "way",
+   "osm_id": 635046725,
+   "name": "Primary Health Centre Nedumpuram"
+  },
+  {
+   "district": "Alappuzha",
+   "lat": 9.3175292,
+   "lon": 76.3809759,
+   "osm_type": "node",
+   "osm_id": 7372982940,
+   "name": "Thottapally PHC"
+  },
+  {
+   "district": "Alappuzha",
+   "lat": 9.8082995,
+   "lon": 76.3533699,
+   "osm_type": "node",
+   "osm_id": 7476686884,
+   "name": "Primary Health Centre Panvally"
+  },
+  {
+   "district": "Alappuzha",
+   "lat": 9.1320808,
+   "lon": 76.569437,
+   "osm_type": "node",
+   "osm_id": 7485424141,
+   "name": "Primary Health Centre Vallikunnam"
+  },
+  {
+   "district": "Alappuzha",
+   "lat": 9.3076613,
+   "lon": 76.4256842,
+   "osm_type": "node",
+   "osm_id": 7485497905,
+   "name": "PHC Karuvatta"
+  },
+  {
+   "district": "Alappuzha",
+   "lat": 9.3251314,
+   "lon": 76.4609577,
+   "osm_type": "node",
+   "osm_id": 7488886308,
+   "name": "Veeyapuram Primary Health Centre"
+  },
+  {
+   "district": "Kottayam",
+   "lat": 9.6537461,
+   "lon": 76.7777115,
+   "osm_type": "node",
+   "osm_id": 6552435292,
+   "name": "Primary Health Center, Thidanadu"
+  },
+  {
+   "district": "Kottayam",
+   "lat": 9.6722435,
+   "lon": 76.6678907,
+   "osm_type": "node",
+   "osm_id": 7340455409,
+   "name": "Primary Health Centre, Kozhuvanal"
+  },
+  {
+   "district": "Kottayam",
+   "lat": 9.5457468,
+   "lon": 76.5103986,
+   "osm_type": "node",
+   "osm_id": 7488986775,
+   "name": "Primary Health Centre, Nattakom"
+  },
+  {
+   "district": "Kottayam",
+   "lat": 9.5811036,
+   "lon": 76.4777964,
+   "osm_type": "node",
+   "osm_id": 7497361107,
+   "name": "Primary Health Centre, Thiruvarppu"
+  },
+  {
+   "district": "Kottayam",
+   "lat": 9.7444249,
+   "lon": 76.4801952,
+   "osm_type": "node",
+   "osm_id": 8880257015,
+   "name": "Primary Health Centre, Kaduthuruthy"
+  },
+  {
+   "district": "Idukki",
+   "lat": 9.6059027,
+   "lon": 77.1627166,
+   "osm_type": "node",
+   "osm_id": 6950768008,
+   "name": "Primary Health Centre Kumily"
+  },
+  {
+   "district": "Idukki",
+   "lat": 9.9442954,
+   "lon": 77.0209811,
+   "osm_type": "node",
+   "osm_id": 7469318429,
+   "name": "Family Health Centre Konnathadi"
+  },
+  {
+   "district": "Idukki",
+   "lat": 10.2135305,
+   "lon": 77.1977232,
+   "osm_type": "node",
+   "osm_id": 7476750805,
+   "name": "Primary Health Centre Kanthaloor"
+  },
+  {
+   "district": "Idukki",
+   "lat": 9.9616654,
+   "lon": 77.0969291,
+   "osm_type": "node",
+   "osm_id": 7476750806,
+   "name": "Primary Health Centre, Rajakad"
+  },
+  {
+   "district": "Idukki",
+   "lat": 9.886373,
+   "lon": 76.950775,
+   "osm_type": "node",
+   "osm_id": 7476750807,
+   "name": "Primary Health Centre, Vazhathope"
+  },
+  {
+   "district": "Ernakulam",
+   "lat": 9.9194425,
+   "lon": 76.3128645,
+   "osm_type": "node",
+   "osm_id": 4867912497,
+   "name": "Nettoor Primary Health Center"
+  },
+  {
+   "district": "Ernakulam",
+   "lat": 10.1386844,
+   "lon": 76.4309998,
+   "osm_type": "node",
+   "osm_id": 7475291099,
+   "name": "Primary Health Centre,Kanjoor"
+  },
+  {
+   "district": "Ernakulam",
+   "lat": 9.9824178,
+   "lon": 76.3241707,
+   "osm_type": "node",
+   "osm_id": 7726235658,
+   "name": "Urban Primary Health Centre, Chalikkavattom"
+  },
+  {
+   "district": "Ernakulam",
+   "lat": 10.0832761,
+   "lon": 76.2895024,
+   "osm_type": "node",
+   "osm_id": 8780579331,
+   "name": "Primary Health Center, Eloor"
+  },
+  {
+   "district": "Ernakulam",
+   "lat": 10.2395353,
+   "lon": 76.420921,
+   "osm_type": "node",
+   "osm_id": 8889596629,
+   "name": "Primary Health Centre, Mookkannor"
+  },
+  {
+   "district": "Thrissur",
+   "lat": 10.497812,
+   "lon": 76.154466,
+   "osm_type": "node",
+   "osm_id": 7724606873,
+   "name": "Primary Health Centre 24*7 Arimpur"
+  },
+  {
+   "district": "Thrissur",
+   "lat": 10.3090957,
+   "lon": 76.317066,
+   "osm_type": "node",
+   "osm_id": 8840838504,
+   "name": "Urban Primary Health Centre, V R Puram"
+  },
+  {
+   "district": "Thrissur",
+   "lat": 10.7469221,
+   "lon": 76.2334546,
+   "osm_type": "node",
+   "osm_id": 8998310243,
+   "name": "Family Health Centre Deshamangalam"
+  },
+  {
+   "district": "Thrissur",
+   "lat": 10.7267588,
+   "lon": 76.3958593,
+   "osm_type": "node",
+   "osm_id": 8998310244,
+   "name": "Family Health Centre Kondazhy"
+  },
+  {
+   "district": "Thrissur",
+   "lat": 10.6401705,
+   "lon": 76.1204019,
+   "osm_type": "node",
+   "osm_id": 9156997061,
+   "name": "Primary Health Centre Choondal"
+  },
+  {
+   "district": "Palakkad",
+   "lat": 10.8386399,
+   "lon": 76.5807474,
+   "osm_type": "node",
+   "osm_id": 7480354153,
+   "name": "Family Health Center Mundoor"
+  },
+  {
+   "district": "Palakkad",
+   "lat": 10.8867354,
+   "lon": 76.2691612,
+   "osm_type": "node",
+   "osm_id": 8879329917,
+   "name": "Family Health Center Nellaya"
+  },
+  {
+   "district": "Palakkad",
+   "lat": 10.8062558,
+   "lon": 76.0684972,
+   "osm_type": "node",
+   "osm_id": 8882187517,
+   "name": "Primary Health Center Kappoor"
+  },
+  {
+   "district": "Palakkad",
+   "lat": 10.8305907,
+   "lon": 76.0521849,
+   "osm_type": "node",
+   "osm_id": 8882229417,
+   "name": "Family Health Center Kumbidi"
+  },
+  {
+   "district": "Palakkad",
+   "lat": 10.6288949,
+   "lon": 76.6422317,
+   "osm_type": "node",
+   "osm_id": 8904005917,
+   "name": "Family Health Centre Pallasanna"
+  },
+  {
+   "district": "Malappuram",
+   "lat": 10.6986389,
+   "lon": 75.9606899,
+   "osm_type": "node",
+   "osm_id": 4124941674,
+   "name": "24x7 Govt Primary Health centre Palappetty"
+  },
+  {
+   "district": "Malappuram",
+   "lat": 11.2394003,
+   "lon": 76.0829001,
+   "osm_type": "node",
+   "osm_id": 7476401155,
+   "name": "Govt Primary Health Centre Odakkayam"
+  },
+  {
+   "district": "Malappuram",
+   "lat": 11.2232104,
+   "lon": 75.9015049,
+   "osm_type": "node",
+   "osm_id": 7479082230,
+   "name": "24x7 Govt Primary Health centre Vazhayur"
+  },
+  {
+   "district": "Malappuram",
+   "lat": 11.0269287,
+   "lon": 76.0295522,
+   "osm_type": "node",
+   "osm_id": 7480632980,
+   "name": "Government Primary Health Centre Othukkungal"
+  },
+  {
+   "district": "Malappuram",
+   "lat": 11.2434966,
+   "lon": 76.1829522,
+   "osm_type": "node",
+   "osm_id": 7486232149,
+   "name": "Government Primary Health Centre Mampad"
+  },
+  {
+   "district": "Kozhikode",
+   "lat": 11.6780233,
+   "lon": 75.5524417,
+   "osm_type": "node",
+   "osm_id": 3806168900,
+   "name": "Primary Health Center Azhiyur"
+  },
+  {
+   "district": "Kozhikode",
+   "lat": 11.2216162,
+   "lon": 75.7965891,
+   "osm_type": "node",
+   "osm_id": 7469342604,
+   "name": "Urban Primary Health Centre, Kannancheri"
+  },
+  {
+   "district": "Kozhikode",
+   "lat": 11.2074485,
+   "lon": 75.8189051,
+   "osm_type": "node",
+   "osm_id": 7498943632,
+   "name": "Primary Health Centre, Cheruvannur Nallalam"
+  },
+  {
+   "district": "Kozhikode",
+   "lat": 11.7068297,
+   "lon": 75.6323093,
+   "osm_type": "node",
+   "osm_id": 7720642281,
+   "name": "Primary Health Centre Tuneri"
+  },
+  {
+   "district": "Kozhikode",
+   "lat": 11.654666,
+   "lon": 75.6972972,
+   "osm_type": "node",
+   "osm_id": 7720642287,
+   "name": "Primary Health Centre Purameri"
+  },
+  {
+   "district": "Wayanad",
+   "lat": 11.5584994,
+   "lon": 76.130717,
+   "osm_type": "node",
+   "osm_id": 7130228002,
+   "name": "Family Health Centre Meppadi"
+  },
+  {
+   "district": "Wayanad",
+   "lat": 11.7764224,
+   "lon": 75.9764867,
+   "osm_type": "node",
+   "osm_id": 7479173997,
+   "name": "Family Health centre  Edavaka"
+  },
+  {
+   "district": "Wayanad",
+   "lat": 11.6213793,
+   "lon": 76.1581686,
+   "osm_type": "node",
+   "osm_id": 8002235743,
+   "name": "Primary Health Centre Vazhavatta"
+  },
+  {
+   "district": "Wayanad",
+   "lat": 11.8205132,
+   "lon": 76.1653784,
+   "osm_type": "node",
+   "osm_id": 8998387387,
+   "name": "Primary Health Centre Mullankolly"
+  },
+  {
+   "district": "Wayanad",
+   "lat": 11.6303539,
+   "lon": 76.0333245,
+   "osm_type": "node",
+   "osm_id": 8998387388,
+   "name": "Family Health Centre Vengapally"
+  },
+  {
+   "district": "Kannur",
+   "lat": 11.7694129,
+   "lon": 75.4969657,
+   "osm_type": "node",
+   "osm_id": 7366794122,
+   "name": "Urban Primary Health Centrre, Kolassery"
+  },
+  {
+   "district": "Kannur",
+   "lat": 11.8138976,
+   "lon": 75.6256969,
+   "osm_type": "node",
+   "osm_id": 7472802731,
+   "name": "Primary Health Care, Cheruvancheri"
+  },
+  {
+   "district": "Kannur",
+   "lat": 12.0788019,
+   "lon": 75.2657812,
+   "osm_type": "node",
+   "osm_id": 7472814657,
+   "name": "Family Health Centre, Cheruthazham"
+  },
+  {
+   "district": "Kannur",
+   "lat": 11.8761013,
+   "lon": 75.8589014,
+   "osm_type": "node",
+   "osm_id": 7472831087,
+   "name": "Family health centre, Kottiyoor"
+  },
+  {
+   "district": "Kannur",
+   "lat": 11.9281605,
+   "lon": 75.347721,
+   "osm_type": "node",
+   "osm_id": 7472832140,
+   "name": "Family Health Centre, Valapattanam"
+  },
+  {
+   "district": "Kasaragod",
+   "lat": 12.6469051,
+   "lon": 75.1068465,
+   "osm_type": "node",
+   "osm_id": 7380186316,
+   "name": "Primary Health Centre Perla (PHC Perla)"
+  },
+  {
+   "district": "Kasaragod",
+   "lat": 12.288592,
+   "lon": 75.2998726,
+   "osm_type": "node",
+   "osm_id": 7470229109,
+   "name": "Primary Health Centre, Moucode"
+  },
+  {
+   "district": "Kasaragod",
+   "lat": 12.2262653,
+   "lon": 75.135513,
+   "osm_type": "node",
+   "osm_id": 7470281515,
+   "name": "PHC Thuruthi"
+  },
+  {
+   "district": "Kasaragod",
+   "lat": 12.2037413,
+   "lon": 75.2049525,
+   "osm_type": "node",
+   "osm_id": 7470336192,
+   "name": "Primary Health Centre Olat"
+  },
+  {
+   "district": "Kasaragod",
+   "lat": 12.5991012,
+   "lon": 74.9400663,
+   "osm_type": "node",
+   "osm_id": 7470516985,
+   "name": "PHC Arikady"
+  }
+ ]
+}

@@ -59,14 +59,17 @@ class Run:
 
 def simulate(seed=0, days=200, n_states=2, n_wh=3, n_phc=6, behaviour="default", crg=None,
              fill=(0.5, 1.0), wh_days=(30, 90), short=(0.0, 0.25), surge=0.5, gap_rate=0.01,
-             p_ration=None, episodes=None):
+             p_ration=None, episodes=None, surges=None):
     """fill: share of a routine indent the warehouse actually sends; wh_days: warehouse
     buffer in days of network use; short: share of supply that still flows during an
     upstream failure; surge: peak monsoon lift of fever/diarrhoea; gap_rate: chance a
     facility starts a 1-5 day data-entry gap on any day; p_ration: override rationing;
     episodes: script the failures instead of drawing them (a scenario replay): dicts of
     type, root ("IN", a state, warehouse or facility id), drug id, start, dur and
-    optionally short. The default draws are untouched, so every seed's world is unchanged."""
+    optionally short. The default draws are untouched, so every seed's world is unchanged.
+    surges: scripted health emergencies: dicts of root (a state, warehouse or facility id),
+    conds (condition ids), lift, start and dur; those diagnoses, and the use they call for,
+    are multiplied by lift. None changes nothing, not even the random draws."""
     rng = np.random.default_rng(seed)
     ix = G.index(crg or G.load())
     B = dict(BEHAVIOUR[behaviour])
@@ -164,8 +167,15 @@ def simulate(seed=0, days=200, n_states=2, n_wh=3, n_phc=6, behaviour="default",
 
         lift = np.ones(C)
         lift[surge_idx] += surge * np.exp(-((t - peak) / 25) ** 2)
-        dx[t] = rng.poisson((lam * lift)[None, :] * size[:, None])
+        m = np.ones((F, C))                             # a health emergency: x lift where and while it runs
+        for s in surges or ():
+            if s["start"] <= t < s["start"] + s["dur"]:
+                where = [s["root"] in (wh[f], st[f], fac[f]) for f in range(F)]
+                m[np.ix_(where, [ix["ci"][c] for c in s["conds"]])] *= s["lift"]
+        dx[t] = rng.poisson((lam * lift)[None, :] * size[:, None] * m)
         USE[t] = size[:, None] * ((lam * lift) @ ix["units"])[None, :]
+        on = (m != 1).any(1)
+        USE[t, on] = size[on, None] * ((lam * lift * m[on]) @ ix["units"])
         for (_, s), p in ix["sub_of"].items():
             USE[t, :, s] = rate[:, s]
         issued = np.zeros((F, D))

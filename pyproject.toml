@@ -7,7 +7,7 @@ dependencies = ["numpy>=1.26", "ortools>=9.10"]
 [project.optional-dependencies]
 app = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2"]
 gemini = ["google-genai>=1.66"]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pillow>=10.1"]   # pillow: tools/registers.py and tests/test_intake.py
 
 [build-system]
 requires = ["setuptools>=68"]

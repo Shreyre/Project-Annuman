@@ -1,0 +1,1620 @@
+{
+ "message": {
+  "kind": "phc",
+  "date": "2026-03-02",
+  "phc": "S1-W1-P5",
+  "diagnoses": {
+   "acute_diarrhoea": 3,
+   "anaemia_pregnancy": 3,
+   "fever": 10,
+   "hypertension": 10,
+   "pneumonia": 7,
+   "type2_diabetes": 8,
+   "uti": 6
+  },
+  "slips": [
+   [
+    "acute_diarrhoea",
+    "ors_sachet",
+    3,
+    6.0
+   ],
+   [
+    "acute_diarrhoea",
+    "ors_sachet",
+    3,
+    6.0
+   ],
+   [
+    "anaemia_pregnancy",
+    "ifa_tab",
+    30,
+    60.0
+   ],
+   [
+    "anaemia_pregnancy",
+    "ifa_tab",
+    30,
+    60.0
+   ],
+   [
+    "anaemia_pregnancy",
+    "ifa_tab",
+    30,
+    60.0
+   ],
+   [
+    "fever",
+    "paracetamol_500",
+    3,
+    12.0
+   ],
+   [
+    "fever",
+    "paracetamol_500",
+    3,
+    12.0
+   ],
+   [
+    "fever",
+    "paracetamol_500",
+    3,
+    12.0
+   ],
+   [
+    "fever",
+    "paracetamol_500",
+    3,
+    12.0
+   ],
+   [
+    "fever",
+    "paracetamol_500",
+    3,
+    12.0
+   ],
+   [
+    "fever",
+    "paracetamol_500",
+    3,
+    12.0
+   ],
+   [
+    "fever",
+    "paracetamol_500",
+    3,
+    12.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    28,
+    28.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    10,
+    10.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    10,
+    10.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    28,
+    28.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    28,
+    28.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    10,
+    10.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    9,
+    9.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    28,
+    28.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    11,
+    11.0
+   ],
+   [
+    "hypertension",
+    "amlodipine_5",
+    13,
+    13.0
+   ],
+   [
+    "pneumonia",
+    "amoxicillin_500",
+    5,
+    15.0
+   ],
+   [
+    "pneumonia",
+    "amoxicillin_500",
+    5,
+    15.0
+   ],
+   [
+    "pneumonia",
+    "amoxicillin_500",
+    5,
+    15.0
+   ],
+   [
+    "pneumonia",
+    "amoxicillin_500",
+    5,
+    15.0
+   ],
+   [
+    "pneumonia",
+    "amoxicillin_500",
+    5,
+    15.0
+   ],
+   [
+    "pneumonia",
+    "amoxicillin_500",
+    5,
+    15.0
+   ],
+   [
+    "type2_diabetes",
+    "metformin_500",
+    28,
+    56.0
+   ],
+   [
+    "type2_diabetes",
+    "metformin_500",
+    28,
+    56.0
+   ],
+   [
+    "type2_diabetes",
+    "metformin_500",
+    28,
+    56.0
+   ],
+   [
+    "type2_diabetes",
+    "metformin_500",
+    28,
+    56.0
+   ],
+   [
+    "type2_diabetes",
+    "metformin_500",
+    28,
+    56.0
+   ],
+   [
+    "type2_diabetes",
+    "metformin_500",
+    28,
+    56.0
+   ],
+   [
+    "type2_diabetes",
+    "metformin_500",
+    28,
+    56.0
+   ],
+   [
+    "uti",
+    "nitrofurantoin_100",
+    5,
+    10.0
+   ],
+   [
+    "uti",
+    "nitrofurantoin_100",
+    5,
+    10.0
+   ],
+   [
+    "uti",
+    "nitrofurantoin_100",
+    5,
+    10.0
+   ],
+   [
+    "uti",
+    "nitrofurantoin_100",
+    5,
+    10.0
+   ]
+  ],
+  "not_available": []
+ },
+ "opd": [
+  {
+   "opd_no": "001",
+   "condition": "type2_diabetes",
+   "written_as": "DM-2"
+  },
+  {
+   "opd_no": "002",
+   "condition": "anaemia_pregnancy",
+   "written_as": "Anaemia (preg)"
+  },
+  {
+   "opd_no": "003",
+   "condition": "fever",
+   "written_as": "Fever"
+  },
+  {
+   "opd_no": "004",
+   "condition": "type2_diabetes",
+   "written_as": "DM-2"
+  },
+  {
+   "opd_no": "005",
+   "condition": "other",
+   "written_as": "Skin allergy"
+  },
+  {
+   "opd_no": "006",
+   "condition": "type2_diabetes",
+   "written_as": "DM-2"
+  },
+  {
+   "opd_no": "007",
+   "condition": "other",
+   "written_as": "Dog bite"
+  },
+  {
+   "opd_no": "008",
+   "condition": "other",
+   "written_as": "Scabies"
+  },
+  {
+   "opd_no": "009",
+   "condition": "fever",
+   "written_as": "Viral fever"
+  },
+  {
+   "opd_no": "010",
+   "condition": "type2_diabetes",
+   "written_as": "T2DM"
+  },
+  {
+   "opd_no": "011",
+   "condition": "hypertension",
+   "written_as": "High BP"
+  },
+  {
+   "opd_no": "012",
+   "condition": "hypertension",
+   "written_as": "HTN"
+  },
+  {
+   "opd_no": "013",
+   "condition": "uti",
+   "written_as": "Burning micturition"
+  },
+  {
+   "opd_no": "014",
+   "condition": "type2_diabetes",
+   "written_as": "Diabetes"
+  },
+  {
+   "opd_no": "015",
+   "condition": "other",
+   "written_as": "Cough/cold"
+  },
+  {
+   "opd_no": "016",
+   "condition": "other",
+   "written_as": "Cough/cold"
+  },
+  {
+   "opd_no": "017",
+   "condition": "hypertension",
+   "written_as": "High BP"
+  },
+  {
+   "opd_no": "018",
+   "condition": "fever",
+   "written_as": "F/O fever"
+  },
+  {
+   "opd_no": "019",
+   "condition": "hypertension",
+   "written_as": "HTN"
+  },
+  {
+   "opd_no": "020",
+   "condition": "fever",
+   "written_as": "F/O fever"
+  },
+  {
+   "opd_no": "021",
+   "condition": "fever",
+   "written_as": "Fever"
+  },
+  {
+   "opd_no": "022",
+   "condition": "acute_diarrhoea",
+   "written_as": "AGE"
+  },
+  {
+   "opd_no": "023",
+   "condition": "fever",
+   "written_as": "Viral fever"
+  },
+  {
+   "opd_no": "024",
+   "condition": "uti",
+   "written_as": "Burning micturition"
+  },
+  {
+   "opd_no": "025",
+   "condition": "type2_diabetes",
+   "written_as": "Diabetes"
+  },
+  {
+   "opd_no": "026",
+   "condition": "acute_diarrhoea",
+   "written_as": "Diarrhoea"
+  },
+  {
+   "opd_no": "027",
+   "condition": "other",
+   "written_as": "Cough/cold"
+  },
+  {
+   "opd_no": "028",
+   "condition": "hypertension",
+   "written_as": "High BP"
+  },
+  {
+   "opd_no": "029",
+   "condition": "pneumonia",
+   "written_as": "LRTI"
+  },
+  {
+   "opd_no": "030",
+   "condition": "hypertension",
+   "written_as": "HTN"
+  },
+  {
+   "opd_no": "031",
+   "condition": "hypertension",
+   "written_as": "Hypertension"
+  },
+  {
+   "opd_no": "032",
+   "condition": "type2_diabetes",
+   "written_as": "T2DM"
+  },
+  {
+   "opd_no": "033",
+   "condition": "hypertension",
+   "written_as": "High BP"
+  },
+  {
+   "opd_no": "034",
+   "condition": "anaemia_pregnancy",
+   "written_as": "ANC - anaemia"
+  },
+  {
+   "opd_no": "035",
+   "condition": "uti",
+   "written_as": "UTI"
+  },
+  {
+   "opd_no": "036",
+   "condition": "uti",
+   "written_as": "Burning micturition"
+  },
+  {
+   "opd_no": "037",
+   "condition": "pneumonia",
+   "written_as": "LRTI"
+  },
+  {
+   "opd_no": "038",
+   "condition": "pneumonia",
+   "written_as": "CAP"
+  },
+  {
+   "opd_no": "039",
+   "condition": "hypertension",
+   "written_as": "High BP"
+  },
+  {
+   "opd_no": "040",
+   "condition": "type2_diabetes",
+   "written_as": "DM-2"
+  },
+  {
+   "opd_no": "041",
+   "condition": "fever",
+   "written_as": "PUO"
+  },
+  {
+   "opd_no": "042",
+   "condition": "uti",
+   "written_as": "Burning micturition"
+  },
+  {
+   "opd_no": "043",
+   "condition": "other",
+   "written_as": "Dog bite"
+  },
+  {
+   "opd_no": "044",
+   "condition": "pneumonia",
+   "written_as": "LRTI"
+  },
+  {
+   "opd_no": "045",
+   "condition": "anaemia_pregnancy",
+   "written_as": "ANC, Hb 8.9"
+  },
+  {
+   "opd_no": "046",
+   "condition": "pneumonia",
+   "written_as": "Pneumonia"
+  },
+  {
+   "opd_no": "047",
+   "condition": "uti",
+   "written_as": "UTI"
+  },
+  {
+   "opd_no": "048",
+   "condition": "fever",
+   "written_as": "F/O fever"
+  },
+  {
+   "opd_no": "049",
+   "condition": "pneumonia",
+   "written_as": "CAP"
+  },
+  {
+   "opd_no": "050",
+   "condition": "hypertension",
+   "written_as": "Hypertension"
+  },
+  {
+   "opd_no": "051",
+   "condition": "pneumonia",
+   "written_as": "LRTI"
+  },
+  {
+   "opd_no": "052",
+   "condition": "acute_diarrhoea",
+   "written_as": "AGE"
+  },
+  {
+   "opd_no": "053",
+   "condition": "fever",
+   "written_as": "Fever"
+  },
+  {
+   "opd_no": "054",
+   "condition": "fever",
+   "written_as": "Viral fever"
+  }
+ ],
+ "dispensing": [
+  {
+   "opd_no": "001",
+   "drug": "metformin_500",
+   "written_as": "Tab Metf 500",
+   "days": 28,
+   "units": 56.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "002",
+   "drug": "ifa_tab",
+   "written_as": "IFA (red)",
+   "days": 30,
+   "units": 60.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "003",
+   "drug": "paracetamol_500",
+   "written_as": "Tab PCM 500",
+   "days": 3,
+   "units": 12.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "004",
+   "drug": "metformin_500",
+   "written_as": "Tab Metformin 500",
+   "days": 28,
+   "units": 56.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "005",
+   "drug": "other",
+   "written_as": "Tab Cetirizine 10",
+   "days": 5,
+   "units": 5,
+   "not_available": false
+  },
+  {
+   "opd_no": "006",
+   "drug": "metformin_500",
+   "written_as": "Tab Metformin 500",
+   "days": 28,
+   "units": 56.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "007",
+   "drug": "other",
+   "written_as": "Inj ARV",
+   "days": 1,
+   "units": 1,
+   "not_available": false
+  },
+  {
+   "opd_no": "008",
+   "drug": "other",
+   "written_as": "Oint Permethrin 5%",
+   "days": 0,
+   "units": 1,
+   "not_available": false
+  },
+  {
+   "opd_no": "009",
+   "drug": "paracetamol_500",
+   "written_as": "Tab Paracetamol 500",
+   "days": 3,
+   "units": 12.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "010",
+   "drug": "metformin_500",
+   "written_as": "Tab Metf 500",
+   "days": 28,
+   "units": 56.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "011",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlo 5",
+   "days": 28,
+   "units": 28.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "012",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlodipine 5mg",
+   "days": 10,
+   "units": 10.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "013",
+   "drug": "nitrofurantoin_100",
+   "written_as": "Tab Nitrofurantoin 100",
+   "days": 5,
+   "units": 10.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "014",
+   "drug": "metformin_500",
+   "written_as": "Tab Metf 500",
+   "days": 28,
+   "units": 56.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "015",
+   "drug": "other",
+   "written_as": "Tab CPM 4",
+   "days": 3,
+   "units": 9,
+   "not_available": false
+  },
+  {
+   "opd_no": "016",
+   "drug": "other",
+   "written_as": "Tab CPM 4",
+   "days": 3,
+   "units": 9,
+   "not_available": false
+  },
+  {
+   "opd_no": "017",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlo 5",
+   "days": 10,
+   "units": 10.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "018",
+   "drug": "paracetamol_500",
+   "written_as": "Tab PCM 500",
+   "days": 3,
+   "units": 12.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "019",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlo 5",
+   "days": 28,
+   "units": 28.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "020",
+   "drug": "paracetamol_500",
+   "written_as": "Tab Paracetamol 500",
+   "days": 3,
+   "units": 12.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "021",
+   "drug": "paracetamol_500",
+   "written_as": "Tab PCM 500",
+   "days": 3,
+   "units": 12.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "022",
+   "drug": "ors_sachet",
+   "written_as": "ORS pkt",
+   "days": 3,
+   "units": 6.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "023",
+   "drug": "paracetamol_500",
+   "written_as": "Tab PCM 500",
+   "days": 3,
+   "units": 12.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "024",
+   "drug": "nitrofurantoin_100",
+   "written_as": "Tab Nitrofurantoin 100",
+   "days": 5,
+   "units": 10.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "025",
+   "drug": "metformin_500",
+   "written_as": "Tab Metformin 500",
+   "days": 28,
+   "units": 56.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "026",
+   "drug": "ors_sachet",
+   "written_as": "ORS pkt",
+   "days": 3,
+   "units": 6.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "028",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlodipine 5mg",
+   "days": 28,
+   "units": 28.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "029",
+   "drug": "amoxicillin_500",
+   "written_as": "Cap Amoxy 500",
+   "days": 5,
+   "units": 15.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "030",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlodipine 5mg",
+   "days": 10,
+   "units": 10.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "031",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlo 5",
+   "days": 9,
+   "units": 9.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "032",
+   "drug": "metformin_500",
+   "written_as": "Tab Metf 500",
+   "days": 28,
+   "units": 56.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "033",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlodipine 5mg",
+   "days": 28,
+   "units": 28.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "034",
+   "drug": "ifa_tab",
+   "written_as": "Tab IFA",
+   "days": 30,
+   "units": 60.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "035",
+   "drug": "nitrofurantoin_100",
+   "written_as": "Tab Nitrofurantoin 100",
+   "days": 5,
+   "units": 10.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "036",
+   "drug": "nitrofurantoin_100",
+   "written_as": "Tab Nitrofurantoin 100",
+   "days": 5,
+   "units": 10.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "037",
+   "drug": "amoxicillin_500",
+   "written_as": "Cap Amoxy 500",
+   "days": 5,
+   "units": 15.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "038",
+   "drug": "amoxicillin_500",
+   "written_as": "Cap Amoxicillin 500",
+   "days": 5,
+   "units": 15.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "039",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlodipine 5mg",
+   "days": 11,
+   "units": 11.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "041",
+   "drug": "paracetamol_500",
+   "written_as": "Tab PCM 500",
+   "days": 3,
+   "units": 12.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "044",
+   "drug": "amoxicillin_500",
+   "written_as": "Cap Amoxy 500",
+   "days": 5,
+   "units": 15.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "045",
+   "drug": "ifa_tab",
+   "written_as": "Tab IFA",
+   "days": 30,
+   "units": 60.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "046",
+   "drug": "amoxicillin_500",
+   "written_as": "Cap Amoxicillin 500",
+   "days": 5,
+   "units": 15.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "049",
+   "drug": "amoxicillin_500",
+   "written_as": "Cap Amoxy 500",
+   "days": 5,
+   "units": 15.0,
+   "not_available": false
+  },
+  {
+   "opd_no": "050",
+   "drug": "amlodipine_5",
+   "written_as": "Tab Amlo 5",
+   "days": 13,
+   "units": 13.0,
+   "not_available": false
+  }
+ ],
+ "pages": [
+  "opd_1.jpg",
+  "opd_2.jpg",
+  "disp_1.jpg",
+  "disp_2.jpg"
+ ],
+ "note": "SYNTHETIC: synthetic pages rendered in a handwriting font; not real registers. message is the simulator's PHC-day; opd and dispensing are the rows on the pages",
+ "seed": 6,
+ "day": 60,
+ "recorded_read": {
+  "read": {
+   "opd": [
+    {
+     "opd_no": "001",
+     "written_as": "DM-2",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "002",
+     "written_as": "Anaemia (preg)",
+     "condition": "anaemia_pregnancy",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "003",
+     "written_as": "Fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "004",
+     "written_as": "DM-2",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "005",
+     "written_as": "Skin allergy",
+     "condition": "other",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "006",
+     "written_as": "DM-2",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "007",
+     "written_as": "Dog bite",
+     "condition": "other",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "008",
+     "written_as": "Scabies",
+     "condition": "other",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "009",
+     "written_as": "Viral fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "010",
+     "written_as": "T2DM",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "011",
+     "written_as": "High BP",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "012",
+     "written_as": "HTN",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "013",
+     "written_as": "Burning micturition",
+     "condition": "uti",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "014",
+     "written_as": "Diabetes",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "015",
+     "written_as": "Cough/cold",
+     "condition": "other",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "016",
+     "written_as": "Cough/cold",
+     "condition": "other",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "017",
+     "written_as": "High BP",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "018",
+     "written_as": "F/O fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "019",
+     "written_as": "HTN",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "020",
+     "written_as": "F/O fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "021",
+     "written_as": "Fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "022",
+     "written_as": "AGE",
+     "condition": "acute_diarrhoea",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "023",
+     "written_as": "Viral fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "024",
+     "written_as": "Burning micturition",
+     "condition": "uti",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "025",
+     "written_as": "Diabetes",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "026",
+     "written_as": "Diarrhoea",
+     "condition": "acute_diarrhoea",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "027",
+     "written_as": "Cough/cold",
+     "condition": "other",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "028",
+     "written_as": "High BP",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "029",
+     "written_as": "LRTI",
+     "condition": "pneumonia",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "030",
+     "written_as": "HTN",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "031",
+     "written_as": "Hypertension",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "032",
+     "written_as": "T2DM",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "033",
+     "written_as": "High BP",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "034",
+     "written_as": "ANC - anaemia",
+     "condition": "anaemia_pregnancy",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "035",
+     "written_as": "UTI",
+     "condition": "uti",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "036",
+     "written_as": "Burning micturition",
+     "condition": "uti",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "037",
+     "written_as": "LRTI",
+     "condition": "pneumonia",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "038",
+     "written_as": "CAP",
+     "condition": "pneumonia",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "039",
+     "written_as": "High BP",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "040",
+     "written_as": "DM-2",
+     "condition": "type2_diabetes",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "041",
+     "written_as": "PUO",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "042",
+     "written_as": "Burning micturition",
+     "condition": "uti",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "043",
+     "written_as": "Dog bite",
+     "condition": "other",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "044",
+     "written_as": "LRTI",
+     "condition": "pneumonia",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "045",
+     "written_as": "ANC, Hb 8.9",
+     "condition": "anaemia_pregnancy",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "046",
+     "written_as": "Pneumonia",
+     "condition": "pneumonia",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "047",
+     "written_as": "UTI",
+     "condition": "uti",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "048",
+     "written_as": "F/O fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "049",
+     "written_as": "CAP",
+     "condition": "pneumonia",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "050",
+     "written_as": "Hypertension",
+     "condition": "hypertension",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "051",
+     "written_as": "LRTI",
+     "condition": "pneumonia",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "052",
+     "written_as": "AGE",
+     "condition": "acute_diarrhoea",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "053",
+     "written_as": "Fever",
+     "condition": "fever",
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "054",
+     "written_as": "Viral fever",
+     "condition": "fever",
+     "confidence": 1.0
+    }
+   ],
+   "dispensing": [
+    {
+     "opd_no": "001",
+     "written_as": "Tab Metf 500",
+     "drug": "metformin_500",
+     "days": 28,
+     "units": 56.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "002",
+     "written_as": "IFA (red)",
+     "drug": "ifa_tab",
+     "days": 30,
+     "units": 60.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "003",
+     "written_as": "Tab PCM 500",
+     "drug": "paracetamol_500",
+     "days": 3,
+     "units": 12.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "004",
+     "written_as": "Tab Metformin 500",
+     "drug": "metformin_500",
+     "days": 28,
+     "units": 56.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "005",
+     "written_as": "Tab Cetirizine 10",
+     "drug": "other",
+     "days": 5,
+     "units": 5.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "006",
+     "written_as": "Tab Metformin 500",
+     "drug": "metformin_500",
+     "days": 28,
+     "units": 56.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "007",
+     "written_as": "Inj ARV",
+     "drug": "other",
+     "days": 1,
+     "units": 1.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "008",
+     "written_as": "Oint Permethrin 5%",
+     "drug": "other",
+     "days": 0,
+     "units": 1.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "009",
+     "written_as": "Tab Paracetamol 500",
+     "drug": "paracetamol_500",
+     "days": 3,
+     "units": 12.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "010",
+     "written_as": "Tab Metf 500",
+     "drug": "metformin_500",
+     "days": 28,
+     "units": 56.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "011",
+     "written_as": "Tab Amlo 5",
+     "drug": "amlodipine_5",
+     "days": 28,
+     "units": 28.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "012",
+     "written_as": "Tab Amlodipine 5mg",
+     "drug": "amlodipine_5",
+     "days": 10,
+     "units": 10.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "013",
+     "written_as": "Tab Nitrofurantoin 100",
+     "drug": "nitrofurantoin_100",
+     "days": 5,
+     "units": 10.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "014",
+     "written_as": "Tab Metf 500",
+     "drug": "metformin_500",
+     "days": 28,
+     "units": 56.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "015",
+     "written_as": "Tab CPM 4",
+     "drug": "other",
+     "days": 3,
+     "units": 9.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "016",
+     "written_as": "Tab CPM 4",
+     "drug": "other",
+     "days": 3,
+     "units": 9.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "017",
+     "written_as": "Tab Amlo 5",
+     "drug": "amlodipine_5",
+     "days": 10,
+     "units": 10.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "018",
+     "written_as": "Tab PCM 500",
+     "drug": "paracetamol_500",
+     "days": 3,
+     "units": 12.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "019",
+     "written_as": "Tab Amlo 5",
+     "drug": "amlodipine_5",
+     "days": 28,
+     "units": 28.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "020",
+     "written_as": "Tab Paracetamol 500",
+     "drug": "paracetamol_500",
+     "days": 3,
+     "units": 12.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "021",
+     "written_as": "Tab PCM 500",
+     "drug": "paracetamol_500",
+     "days": 3,
+     "units": 12.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "022",
+     "written_as": "ORS pkt",
+     "drug": "ors_sachet",
+     "days": 3,
+     "units": 6.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "023",
+     "written_as": "Tab PCM 500",
+     "drug": "paracetamol_500",
+     "days": 3,
+     "units": 12.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "024",
+     "written_as": "Tab Nitrofurantoin 100",
+     "drug": "nitrofurantoin_100",
+     "days": 5,
+     "units": 10.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "025",
+     "written_as": "Tab Metformin 500",
+     "drug": "metformin_500",
+     "days": 28,
+     "units": 56.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "026",
+     "written_as": "ORS pkt",
+     "drug": "ors_sachet",
+     "days": 3,
+     "units": 6.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "028",
+     "written_as": "Tab Amlodipine 5mg",
+     "drug": "amlodipine_5",
+     "days": 28,
+     "units": 28.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "029",
+     "written_as": "Cap Amoxy 500",
+     "drug": "amoxicillin_500",
+     "days": 5,
+     "units": 15.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "030",
+     "written_as": "Tab Amlodipine 5mg",
+     "drug": "amlodipine_5",
+     "days": 10,
+     "units": 10.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "031",
+     "written_as": "Tab Amlo 5",
+     "drug": "amlodipine_5",
+     "days": 9,
+     "units": 9.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "032",
+     "written_as": "Tab Metf 500",
+     "drug": "metformin_500",
+     "days": 28,
+     "units": 56.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "033",
+     "written_as": "Tab Amlodipine 5mg",
+     "drug": "amlodipine_5",
+     "days": 28,
+     "units": 28.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "034",
+     "written_as": "Tab IFA",
+     "drug": "ifa_tab",
+     "days": 30,
+     "units": 60.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "035",
+     "written_as": "Tab Nitrofurantoin 100",
+     "drug": "nitrofurantoin_100",
+     "days": 5,
+     "units": 10.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "036",
+     "written_as": "Tab Nitrofurantoin 100",
+     "drug": "nitrofurantoin_100",
+     "days": 5,
+     "units": 10.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "037",
+     "written_as": "Cap Amoxy 500",
+     "drug": "amoxicillin_500",
+     "days": 5,
+     "units": 15.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "038",
+     "written_as": "Cap Amoxicillin 500",
+     "drug": "amoxicillin_500",
+     "days": 5,
+     "units": 15.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "039",
+     "written_as": "Tab Amlodipine 5mg",
+     "drug": "amlodipine_5",
+     "days": 11,
+     "units": 11.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "041",
+     "written_as": "Tab PCM 500",
+     "drug": "paracetamol_500",
+     "days": 3,
+     "units": 12.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "044",
+     "written_as": "Cap Amoxy 500",
+     "drug": "amoxicillin_500",
+     "days": 5,
+     "units": 15.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "045",
+     "written_as": "Tab IFA",
+     "drug": "ifa_tab",
+     "days": 30,
+     "units": 60.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "046",
+     "written_as": "Cap Amoxicillin 500",
+     "drug": "amoxicillin_500",
+     "days": 5,
+     "units": 15.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "049",
+     "written_as": "Cap Amoxy 500",
+     "drug": "amoxicillin_500",
+     "days": 5,
+     "units": 15.0,
+     "not_available": false,
+     "confidence": 1.0
+    },
+    {
+     "opd_no": "050",
+     "written_as": "Tab Amlo 5",
+     "drug": "amlodipine_5",
+     "days": 13,
+     "units": 13.0,
+     "not_available": false,
+     "confidence": 1.0
+    }
+   ]
+  },
+  "seconds": 31.6,
+  "model": "gemini-3.7-flash",
+  "prompt_hash": "4367e71d1722",
+  "run_at": "2026-10-01T02:24+05:30"
+ }
+}
