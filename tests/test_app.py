@@ -278,8 +278,8 @@ def test_the_google_badge_says_live_only_with_a_moment_this_process_saw(monkeypa
     assert "anumaan-demo-00001-abc" in by["Cloud Run"]["detail"] and f"of {main.GEMINI_CAP} calls today" in by["Gemini on Vertex AI"]["detail"]
     assert (by["BigQuery clean room"]["status"], by["Google Maps Routes API"]["status"]) == ("offline", "cached")
     assert "8,400 rows" in by["BigQuery clean room"]["detail"] and "6 guideline PDFs" in by["Gemini grammar compiler"]["detail"]
-    tfm = by["TimesFM on BigQuery (AI.FORECAST)"]     # run at 20:29 UTC on 30 Sep: 1 Oct in IST, after the deadline
-    assert tfm["as_of"] == "2026-10-01T01:59:05+05:30" and "a plain mean of past demand" in tfm["detail"]
+    tfm = by["TimesFM on BigQuery (AI.FORECAST)"]
+    assert tfm["as_of"] is None and "a plain mean of past demand" in tfm["detail"]
     # never a token, a project number or id, or an email
     assert "secret-token" not in g.text and "@" not in g.text and not re.search(r"\d{12}", g.text)
     assert not os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ["GOOGLE_CLOUD_PROJECT"] not in g.text

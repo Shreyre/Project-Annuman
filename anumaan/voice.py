@@ -246,7 +246,7 @@ def write_brief(facts: dict, language: str = "en", client=None) -> dict:
 TTS_MODEL = "gemini-2.5-flash-tts"
 SPEAKER = "Kore"          # one of Gemini-TTS's 30 voices, for every language; the locale sets the language
 TTS_MAX_BYTES = 8000      # Vertex AI's cap on a Gemini-TTS request
-# Speech took about as long to make as to play (1 Oct: 7.4 s for 7.85 s of Malayalam, 6.8 s for 7.61 s
+# Speech took about as long to make as to play (7.4 s for 7.85 s of Malayalam, 6.8 s for 7.61 s
 # of Hindi), so a whole brief can run past TIMEOUT_MS
 TTS_TIMEOUT_MS = 120_000
 

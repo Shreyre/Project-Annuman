@@ -9,9 +9,6 @@ invented). The exceptions are anumaan/realcheck_england.json and
 anumaan/realcheck_india.json (see "Real data" below). The Kerala replay's PHC locations are
 real (see "Real locations" below); every record shown at them is synthetic.
 
-This branch (demo-day) holds work done after the 30 September 2026 submission; the
-submitted version is main at commit 1d51118.
-
 Third-party software (runtime)
   NumPy                   BSD-3-Clause (and bundled MIT, Zlib, 0BSD, CC0-1.0 parts)
   Google OR-Tools         Apache-2.0
@@ -33,7 +30,7 @@ Tools only (tools/; not a runtime dependency)
 Google services the demo calls
   Gemini on Vertex AI (grammar compiler, voice shelf check, district officer's brief),
   Cloud Run, BigQuery, Google Maps Routes API, Pub/Sub (the live feed, once deploy/live.sh is run).
-  Added on this branch: Gemini on Vertex AI reading photos of paper registers (anumaan/intake.py);
+  Also: Gemini on Vertex AI reading photos of paper registers (anumaan/intake.py);
   Gemini-TTS on Vertex AI (gemini-2.5-flash-tts) reading the brief aloud; BigQuery AI.FORECAST
   with TimesFM 2.5 (an offline re-test, anumaan/timesfm_retest.json; the app does not call it);
   the Routes API for the Kerala replay's road times (fetched once, cached).
@@ -48,7 +45,7 @@ Real data
   anumaan/realcheck_india.json holds district-month totals from the Health Management
   Information System (HMIS), Ministry of Health and Family Welfare, Government of India:
   Standard Reports, C2 'Data Itemwise Monthly (up to sub district)', 'All States and Districts
-  Across Months', FY 2017-18 to 2019-20 (https://hmis.mohfw.gov.in), fetched 1 October 2026.
+  Across Months', FY 2017-18 to 2019-20 (https://hmis.mohfw.gov.in).
   Source: HMIS, Ministry of Health and Family Welfare, Government of India. The portal states
   no open licence (its Terms of Use, https://hmis.mohfw.gov.in/components/public/terms.html:
   'for reference purposes only'); the same item-wise monthly reports are published on
@@ -57,15 +54,14 @@ Real data
 
 Real locations (the Kerala replay)
   anumaan/kerala_phcs.json lists 70 public Primary/Family Health Centre locations in Kerala,
-  five per district, taken from OpenStreetMap through the Overpass API on 1 October 2026; their
+  five per district, taken from OpenStreetMap through the Overpass API; their
   districts come from OpenStreetMap's district boundaries. The same 70 coordinates key the
   Kerala road times in anumaan/road_minutes.json. Map data (c) OpenStreetMap contributors,
   available under the Open Database License 1.0 (https://opendatacommons.org/licenses/odbl/1-0/,
   https://www.openstreetmap.org/copyright). kerala_phcs.json and those coordinates are made
   available under the same licence. Every record the replay shows at these locations is
   synthetic, and the facilities' names are not shown.
-  Road times between them: Google Maps Platform Routes API (computeRouteMatrix), fetched
-  1 October 2026.
+  Road times between them: Google Maps Platform Routes API (computeRouteMatrix), fetched once and cached.
 
 Reports the Kerala replay follows (anumaan/scenario.py; the replay's records are synthetic)
   Onmanorama, 22 September 2026, "Bureaucratic paralysis chokes medicine supplies in

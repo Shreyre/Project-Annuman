@@ -964,7 +964,6 @@ def _timesfm():
     mean = {s: {k.split(":")[0]: v["mean"] for k, v in res["held_out"][s].items() if isinstance(v, dict)}
             for s in ("5-9", "10-14")}
     w = float(res["seeds_0_4"]["winner"].rsplit(" ", 1)[1])
-    # when the first query ran, in IST like every other stamp: 20:29 UTC on 30 Sep was 1 Oct in India
     ran = datetime.fromisoformat(res["queries"][0]["job_created"].replace("Z", "+00:00")).astimezone(IST)
     return (f"Pre-registered re-test, {len(res['queries'])} BigQuery AI.FORECAST queries: {w:g} x the ETS + {1 - w:g} x "
             f"TimesFM had a lower 14-day demand error (WAPE) than the ETS alone on held-out seeds 5-9 "
@@ -1023,15 +1022,15 @@ def google():
             used_for="each state shares only warehouse x medicine x day rows with 5 or more PHCs behind them",
             detail="proof last run 29 Sep 2026 23:44 IST, 8,400 rows. The app shows the same gate computed in Python: "
                    "its runtime identity may call only Gemini.",
-            source="BigQuery table metadata of anumaan_national.warehouse_day (bq show, read 1 Oct 2026), written "
+            source="BigQuery table metadata of anumaan_national.warehouse_day (bq show), written "
                    "by python -m anumaan.cleanroom proof"),
-        row(service="Google Maps Routes API", status="cached", as_of=fetched, used_for="drive times for the transfers",
+        row(service="Google Maps Routes API", status="cached", used_for="drive times for the transfers",
             detail=f"{roads}; read from a file, never called at runtime", source="anumaan/road_minutes.json"),
         row(service="Gemini grammar compiler", status="offline",
             used_for="turned treatment guidelines into the care-to-resource grammar the filter reads",
             detail=f"{crg['version']}, from {crg['source_note'].count('.pdf')} guideline PDFs",
             source="grammar/crg/compiled.json"),
-        row(service="TimesFM on BigQuery (AI.FORECAST)", status="offline", as_of=queried,
+        row(service="TimesFM on BigQuery (AI.FORECAST)", status="offline",
             used_for="a 14-day demand forecast, tested against the app's own", detail=timesfm,
             source="anumaan/timesfm_retest.json")])
 

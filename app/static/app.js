@@ -83,7 +83,6 @@ function renderSignals() {
   state.cells.forEach((b, key) => { b.disabled = !matches(state.byKey.get(key)); });
 }
 
-const POST = '<span class="tag post">Added after the 30 Sep submission</span>';   // as index.html tags it
 const VIEWS = {
   command: ["Command center", "District command center", "The register says it’s on the shelf. The care says otherwise. Anumaan finds those gaps, district by district."],
   overview: ["Stock signals", "Network overview", "The register says it’s on the shelf. The care says otherwise."],
@@ -99,7 +98,7 @@ function navigate() {
   document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== key; });
   document.querySelectorAll("[data-view]").forEach((a) => { if (a.dataset.view === key) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const [label, title, description] = VIEWS[key];
-  $("#pageTitle").innerHTML = key === "command" ? `${title} ${POST}` : title;
+  $("#pageTitle").textContent = title;
   $("#pageDescription").textContent = description;
   document.title = `${label} | Anumaan`;
   hideTip();
@@ -227,21 +226,25 @@ function showTip(b) {
   const c = state.byKey.get(+b.dataset.f * state.meta.drugs.length + +b.dataset.j);
   if (!c) return;
   const p = place(c.f), [, word] = REGIME[c.regime];
-  tip.innerHTML = `<strong>${drugName(c.j)}</strong><span>${p.phc}, ${p.wh}</span>
+  placeTip(b.getBoundingClientRect(), `<strong>${drugName(c.j)}</strong><span>${p.phc}, ${p.wh}</span>
     <span>Register: ${units(c.book, c.j)}</span><span${c.phantom ? ' class="alert"' : ""}>Shelf: ${word.toLowerCase()}${c.phantom ? ", register disagrees" : ""}</span>
-    ${c.true === undefined ? "" : `<span>Actual: ${units(c.true, c.j)}</span>`}`;
+    ${c.true === undefined ? "" : `<span>Actual: ${units(c.true, c.j)}</span>`}`);
+  document.querySelectorAll("th.hl").forEach((th) => th.classList.remove("hl"));
+  mark(b, true);
+}
+function placeTip(r, html) {   // the one hover card: above r, or below it near the top of the screen
+  tip.innerHTML = html;
   tip.hidden = false;
-  const r = b.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
-  const below = r.top < h + 16 + 64;
+  const w = tip.offsetWidth, h = tip.offsetHeight, below = r.top < h + 16 + 64;
   tip.classList.toggle("below", below);
   tip.style.left = `${Math.min(Math.max(r.left + r.width / 2, w / 2 + 8), innerWidth - w / 2 - 8)}px`;
   tip.style.top = `${below ? r.bottom : r.top}px`;
-  document.querySelectorAll("th.hl").forEach((th) => th.classList.remove("hl"));
-  mark(b, true);
 }
 function hideTip() {
   tip.hidden = true;
   document.querySelectorAll("th.hl").forEach((th) => th.classList.remove("hl"));
+  mapHot = null;
+  $("#ccMap svg")?.classList.remove("focusing");
 }
 
 function headline(data, draw = false) {
@@ -910,9 +913,10 @@ function worst(f) {   // a PHC's worst shelf today: 3 hidden stock-out, 2 empty,
   const J = state.meta.drugs.length;
   return Math.max(...state.meta.drugs.map((_, j) => { const c = state.byKey.get(f * J + j); return c.phantom ? 3 : c.regime === "OUT" ? 2 : c.regime === "SCARCE" || c.alarm ? 1 : 0; }));
 }
-function urgent(fs, js) {   // the most urgent of these PHCs x medicines, as the signal list ranks them; surer of empty first
-  const J = state.meta.drugs.length, key = (c) => (c.phantom ? 0 : c.regime === "OUT" ? 1 : c.regime === "SCARCE" ? 2 : c.alarm ? 3 : 4) - c.p[2] / 2;
-  return fs.flatMap((f) => js.map((j) => state.byKey.get(f * J + j))).reduce((x, y) => (key(y) < key(x) ? y : x));
+const urgency = (c) => (c.phantom ? 0 : c.regime === "OUT" ? 1 : c.regime === "SCARCE" ? 2 : c.alarm ? 3 : 4) - c.p[2] / 2;   // as the signal list ranks; surer of empty first
+function urgent(fs, js) {   // the most urgent of these PHCs x medicines
+  const J = state.meta.drugs.length;
+  return fs.flatMap((f) => js.map((j) => state.byKey.get(f * J + j))).reduce((x, y) => (urgency(y) < urgency(x) ? y : x));
 }
 function openDetail(c) {   // from the command center into the existing investigation of one PHC x medicine, its heading in view
   history.pushState(null, "", "#overview");
@@ -922,9 +926,12 @@ function openDetail(c) {   // from the command center into the existing investig
   $("#detail").scrollIntoView({ block: "start" });   // under the replay bar: scroll-margin-top
 }
 
-let mapArgs;
-function renderMap(d, plan) {   // inline SVG, no tiles and no key: the district's PHCs and the donors of its transfers, fitted
+const DARK = matchMedia("(prefers-color-scheme: dark)");
+let mapArgs, mapSeen, mapHot, mapTiles = "", mapTips = new Map();
+function renderMap(d, plan) {   // inline SVG over map tiles, no key: the district's PHCs and the donors of its transfers, fitted
   mapArgs = [d, plan];
+  if (mapHot) hideTip();   // its card described the map being replaced
+  mapTips = new Map();
   const box = $("#ccMap"), fac = state.meta.facilities, mine = fac.map((x) => !d.wh || x.wh === d.wh);
   const pairs = new Map();   // one arrow per donor -> recipient, whatever the medicines
   for (const m of plan.transfers) {
@@ -932,11 +939,20 @@ function renderMap(d, plan) {   // inline SVG, no tiles and no key: the district
     if (mine[b]) pairs.set(k, [...(pairs.get(k) || []), m]);
   }
   const lead = new Set([...fac.keys()].filter((f) => mine[f]).concat([...pairs.keys()].map((k) => +k.split(">")[0])));
-  const W = Math.max(300, box.clientWidth || 520), M = 30, kx = Math.cos((fac[[...lead][0]].lat * Math.PI) / 180);
-  const X = (f) => fac[f].lon * kx, Y = (f) => -fac[f].lat, xs = [...lead].map(X), ys = [...lead].map(Y);
-  const x0 = Math.min(...xs), y0 = Math.min(...ys), sx = Math.max(Math.max(...xs) - x0, 0.05), sy = Math.max(Math.max(...ys) - y0, 0.05);
+  // Web Mercator in world units (the world is 1 x 1), so the tiles line up under the pins
+  const W = Math.max(300, box.clientWidth || 520), M = 30;
+  const X = (f) => (fac[f].lon + 180) / 360, Y = (f) => 0.5 - Math.asinh(Math.tan((fac[f].lat * Math.PI) / 180)) / (2 * Math.PI);
+  const xs = [...lead].map(X), ys = [...lead].map(Y);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), sx = Math.max(Math.max(...xs) - x0, 1.5e-4), sy = Math.max(Math.max(...ys) - y0, 1.5e-4);
   const s = Math.min((W - 2 * M) / sx, (Math.min(440, W) - 2 * M) / sy), H = Math.round(sy * s + 2 * M), ox = (W - sx * s) / 2;
-  const pt = (f) => [ox + (X(f) - x0) * s, M + (Y(f) - y0) * s].map((v) => Math.round(v * 10) / 10);
+  const r1 = (v) => Math.round(v * 10) / 10, pt = (f) => [ox + (X(f) - x0) * s, M + (Y(f) - y0) * s].map(r1);
+  // Esri's keyless gray canvas, tiles 128-256 px across so they stay sharp; roads and rivers but no place names,
+  // since the demo's points are synthetic and no real village should read as theirs
+  const z = Math.max(0, Math.min(16, Math.ceil(Math.log2(s / 256)))), n = 2 ** z, style = `World_${DARK.matches ? "Dark" : "Light"}_Gray_Base`;
+  let tiles = "";
+  for (let ty = Math.floor((y0 - M / s) * n); ty < (y0 + (H - M) / s) * n; ty++)
+    for (let tx = Math.floor((x0 - ox / s) * n); tx < (x0 + (W - ox) / s) * n; tx++)
+      tiles += `<image href="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${style}/MapServer/tile/${z}/${ty}/${tx}" x="${r1(ox + (tx / n - x0) * s)}" y="${r1(M + (ty / n - y0) * s)}" width="${r1(s / n + 1)}" height="${r1(s / n + 1)}"/>`;
   const named = Boolean(d.wh), labelled = pairs.size <= 12;
   const shown = [...fac.keys()].filter((f) => { const [x, y] = pt(f); return x >= 0 && x <= W && y >= 0 && y <= H; });
   const boxes = shown.filter((f) => lead.has(f)).map((f) => { const [x, y] = pt(f); return { x: x - 8, y: y - 8, w: 16, h: 16 }; });
@@ -964,26 +980,56 @@ function renderMap(d, plan) {   // inline SVG, no tiles and no key: the district
     // no further out than 60 px: a label farther from its arrow reads as belonging to another
     const l = labelled && spot([[0.5, 0], [0.38, 0], [0.62, 0], [0.26, 0], [0.74, 0], [0.5, 22], [0.5, -22], [0.5, 40], [0.5, -40], [0.5, 60], [0.5, -60]]
       .map(([t, o]) => ({ x: on(t, x1, cx, x2) + o * nx - w / 2, y: on(t, y1, cy, y2) + o * ny - 9, w, h: 18 })), false);
-    const p = place(a), q = place(b), title = `<title>${p.phc}, ${p.wh} to ${q.phc}, ${q.wh}, ${road(ms[0].minutes)}: ${ms.map((m) => `${drugName(drugOf(m.drug))}, ${plural(m.courses, "course")}`).join("; ")}</title>`;
-    // the arrow, and its minutes apart: every label is drawn above every arrow
-    return [`<g class="arc">${title}<path d="M${x1},${y1}Q${cx},${cy} ${x2},${y2}" marker-end="url(#mapArrow)"/></g>`,
-      l ? `<g class="arc">${title}<rect x="${l.x}" y="${l.y}" width="${w}" height="18" rx="4"/><text x="${l.x + w / 2}" y="${l.y + 13}">${min}</text></g>` : ""];
+    const p = place(a), q = place(b), path = `M${x1},${y1}Q${cx},${cy} ${x2},${y2}`, ends = `data-a="${a}" data-b="${b}"`;
+    mapTips.set(`a${k}`, `<strong>${p.phc}${mine[a] ? "" : `, ${p.wh}`} to ${q.phc}</strong><span>${road(ms[0].minutes)}</span>${ms.map((m) => `<span>${drugName(drugOf(m.drug))}: ${plural(m.courses, "course")}</span>`).join("")}`);
+    // the arrow, and its minutes apart: every label is drawn above every arrow. pathLength 1: the draw-in and the moving dot are fractions of the route
+    return [`<g class="arc" ${ends}><path class="line" pathLength="1" d="${path}" marker-end="url(#mapArrow)"/><path class="flow" pathLength="1" d="${path}"/><path class="hit" d="${path}"/></g>`,
+      l ? `<g class="arc" ${ends}><rect x="${l.x}" y="${l.y}" width="${w}" height="18" rx="4"/><text x="${l.x + w / 2}" y="${l.y + 13}">${min}</text></g>` : ""];
   });
+  const J = state.meta.drugs.length, say = (c) => (c.phantom ? `hidden stock-out, the register shows ${units(c.book, c.j)}` : c.regime === "OUT" ? "empty"
+    : `${c.regime === "OK" ? "in alarm" : "running short"}${c.shadow === null ? "" : `, ${plural(c.shadow, "day")} left`}`);
+  const card = (f, k) => {   // a PHC's hover card: its medicines that are not plainly stocked, most urgent first, and its transfers on this map
+    const p = place(f), bad = k < 0 ? [] : state.meta.drugs.map((_, j) => state.byKey.get(f * J + j)).filter((c) => c.phantom || c.regime !== "OK" || c.alarm).sort((x, y) => urgency(x) - urgency(y));
+    const moves = [...pairs].filter(([key]) => key.split(">").map(Number).includes(f)).map(([key, ms]) => {
+      const [a, b] = key.split(">").map(Number), o = place(a === f ? b : a);
+      return `<span>${a === f ? "Sends to" : "Gets from"} ${o.phc}${mine[a === f ? b : a] ? "" : `, ${o.wh}`}, ${ms[0].minutes} min: ${ms.map((m) => `${plural(m.courses, "course")} of ${drugName(drugOf(m.drug))}`).join(", ")}</span>`;
+    });
+    return `<strong>${p.phc}, ${p.wh}</strong><span>${k < 0 ? "Donor in another district" : ["All stocked", "At risk", "Empty shelf", "Hidden stock-out"][k]}</span>
+      ${k < 0 ? "" : bad.length ? bad.slice(0, 4).map((c) => `<span${c.regime === "OUT" ? ' class="alert"' : ""}>${drugName(c.j)}: ${say(c)}</span>`).join("") + (bad.length > 4 ? `<span>and ${plural(bad.length - 4, "more medicine")}</span>` : "") : `<span>All ${J} medicines stocked</span>`}
+      ${moves.slice(0, 3).join("")}${moves.length > 3 ? `<span>and ${plural(moves.length - 3, "more transfer")}</span>` : ""}<small>Select to open its most urgent medicine</small>`;
+  };
   const count = [0, 0, 0, 0];
-  let donors = 0;
+  let donors = 0, i = 0;
   const pins = shown.map((f) => {   // only the district's own PHCs show their shelves; a PHC elsewhere is plain, even a donor
     const [cx, cy] = pt(f), k = mine[f] ? worst(f) : -1, p = place(f), main = lead.has(f), what = k < 0 ? "a donor in another district" : KIND[k][1];
     if (k >= 0) count[k]++;
     else donors += main;
-    return `<g class="pin s-${k < 0 ? "away" : KIND[k][0]}${main ? "" : " dim"}" data-f="${f}"${main ? ` tabindex="0" role="button" aria-label="${p.phc}, ${p.wh}: ${what}. Open its most urgent medicine"` : ' aria-hidden="true"'}>${main ? `<title>${p.phc}, ${p.wh}: ${what}</title>` : ""}<circle cx="${cx}" cy="${cy}" r="${main ? 7 : 4.5}"/>${tags.get(f) || ""}</g>`;
+    if (main) mapTips.set(`p${f}`, card(f, k));
+    return `<g class="pin s-${k < 0 ? "away" : KIND[k][0]}${main ? "" : " dim"}" data-f="${f}" style="--i:${main ? i++ : 0}"${main ? ` tabindex="0" role="button" aria-label="${p.phc}, ${p.wh}: ${what}. Open its most urgent medicine"` : ' aria-hidden="true"'}>${k >= 2 ? `<circle class="ring" cx="${cx}" cy="${cy}" r="7"/>` : ""}<circle class="dot" cx="${cx}" cy="${cy}" r="${main ? 7 : 4.5}"/>${tags.get(f) || ""}</g>`;
   }).join("");
-  const where = d.wh ? districtName(d.wh) : "the network";
-  box.innerHTML = `<svg class="map" viewBox="0 0 ${W} ${H}" role="group" aria-label="Map of ${where}: ${plural(count[3], "PHC")} with a hidden stock-out, ${count[2]} with an empty shelf, ${count[1]} at risk, ${count[0]} all stocked; ${plural(pairs.size, "transfer route")} into it${donors ? `; ${plural(donors, "donor PHC")} in other districts` : ""}">
+  const where = d.wh ? districtName(d.wh) : "the network", seen = `${state.net}|${d.wh}`, fresh = mapSeen !== seen;
+  if (box.clientWidth) mapSeen = seen;   // drawn while hidden, the map has not been seen arriving yet
+  const old = box.querySelector(".tiles"), same = old && tiles === mapTiles;
+  mapTiles = tiles;
+  box.innerHTML = `<svg class="map${fresh ? " enter" : ""}" viewBox="0 0 ${W} ${H}" role="group" aria-label="Map of ${where}: ${plural(count[3], "PHC")} with a hidden stock-out, ${count[2]} with an empty shelf, ${count[1]} at risk, ${count[0]} all stocked; ${plural(pairs.size, "transfer route")} into it${donors ? `; ${plural(donors, "donor PHC")} in other districts` : ""}">
     <defs><pattern id="mapHatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5"/><rect width="2" height="5" class="gap"/></pattern>
       <marker id="mapArrow" viewBox="0 0 10 10" refX="21" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z"/></marker></defs>
-    ${arcs.map((a) => a[0]).join("")}${arcs.map((a) => a[1]).join("")}${pins}</svg>
+    <g class="tiles" aria-hidden="true">${tiles}</g>${arcs.map((a) => a[0]).join("")}${arcs.map((a) => a[1]).join("")}${pins}</svg>
+    <p class="map-credit">Tiles © Esri, HERE, Garmin, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>
     <p class="grid-hint map-key"><span><i class="sw ok"></i>All stocked</span><span><i class="sw scarce"></i>At risk</span><span><i class="sw out"></i>Empty shelf</span><span><i class="sw out phantom"></i>Hidden stock-out: the register still shows stock</span>${donors ? '<span><i class="sw away"></i>Donor in another district</span>' : ""}<span><i class="arc-key"></i>Transfer${labelled ? ", road minutes" : ""}</span></p>
     <p class="note map-note">${esc(state.meta.sites_note)} ${state.meta.real_roads ? "Road minutes from the Google Maps Routes API, fetched once and cached." : "Road minutes estimated from straight-line distance."}${labelled ? "" : " Pick a district to see each arrow’s road minutes."}${dropped ? " Labels that would cover others are left out: point at a PHC or an arrow for its name or minutes." : ""}</p>`;
+  if (same) box.querySelector(".tiles").replaceWith(old);   // the replay redraws every day: keep the loaded tiles, no flicker
+}
+function mapHover(g, e) {   // a PHC or an arrow under the mouse, or a PHC in focus: its card, and only its own arrows lit
+  const arc = g?.classList.contains("arc"), key = g && (arc ? `a${g.dataset.a}>${g.dataset.b}` : `p${g.dataset.f}`);
+  if (!mapTips.has(key)) { if (mapHot) hideTip(); return; }
+  if (key === mapHot && !arc) return;   // a PHC's card stays put; an arrow's follows the pointer
+  if (key !== mapHot) {
+    $("#ccMap svg").classList.add("focusing");
+    $("#ccMap").querySelectorAll(".arc").forEach((a) => a.classList.toggle("hot", arc ? a.dataset.a === g.dataset.a && a.dataset.b === g.dataset.b : [a.dataset.a, a.dataset.b].includes(g.dataset.f)));
+  }
+  placeTip(arc ? new DOMRect(e.clientX, e.clientY, 0, 0) : g.querySelector(".dot").getBoundingClientRect(), mapTips.get(key));
+  mapHot = key;
 }
 
 const CALL = { WAREHOUSE: "a warehouse failure", "STATE-PROCUREMENT": "a state procurement failure", "DEMAND-SURGE": "a demand surge" };   // whatif.py's words
@@ -1030,7 +1076,7 @@ async function loadGoogle() {
 }
 function serviceRow(r) {
   const said = { live: `Live: seen by this server at ${r.at && when(r.at)}.`, configured: "Configured on this server, not yet seen answering.",
-    "not configured": "Not configured on this server.", off: "Off on this server.", cached: `Cached: fetched ${r.as_of && when(r.as_of)}.` }[r.status]
+    "not configured": "Not configured on this server.", off: "Off on this server.", cached: `Cached${r.as_of ? `: fetched ${when(r.as_of)}` : ""}.` }[r.status]
     || `Offline${r.as_of ? `: last run ${when(r.as_of)}` : ""}.`;
   const tone = r.status === "live" ? "" : r.status === "configured" ? " carbon" : " muted";
   return `<section class="svc-row"><h3>${esc(r.service)}<span class="badge${tone}">${esc(cap(r.status))}</span></h3><p>${said}</p>
@@ -1062,15 +1108,14 @@ function renderContext() {   // what is different about this network, shown abov
       <div><dt>First shelf truly empty</dt><dd>${w.first === null ? "none" : `${day(w.first)}${w.called === null ? ""
         : ` <small>(${w.first === w.called ? "the day of the call" : `${plural(Math.abs(w.called - w.first), "day")} ${w.first < w.called ? "before" : "after"} the call`})</small>`}`}</dd></div>
       <div><dt>Stock-outs after the call</dt><dd>${w.stockouts ? `${w.after} of ${w.stockouts}` : "none"}</dd></div></dl>`;
-    box.innerHTML = `<div><strong>${esc(s.title)}</strong> <span class="tag">${w ? WHATIF_LABEL : "Scripted what-if, synthetic records"}</span>${w ? POST : ""}<p id="verdict" class="verdict"></p>${story}<p>${esc(s.script)}</p>
+    box.innerHTML = `<div><strong>${esc(s.title)}</strong> <span class="tag">${w ? WHATIF_LABEL : "Scripted what-if, synthetic records"}</span><p id="verdict" class="verdict"></p>${story}<p>${esc(s.script)}</p>
       <details><summary>What it follows, and what is real</summary><p class="quiet">${esc(s.event)}${links ? ` Reports: ${links}.` : ""}</p><p class="quiet">${esc(s.note)}</p></details></div>`;
   } else if (m.live) {
     const s = m.live, via = { "Pub/Sub": " The reports travel through Google Cloud Pub/Sub.", direct: " Pub/Sub is not configured on this copy, so the reports are applied directly." }[s.via] || " Press Start feed to send the next day’s reports.";
     const log = s.log.map((e) => { const p = place(e.f); return `<li>Day ${e.day}, ${p.phc}, ${p.wh}, ${p.st}: ${[e.raised.length ? `new alarm on ${e.raised.map(drugName).join(", ")}` : "", e.cleared.length ? `alarm cleared on ${e.cleared.map(drugName).join(", ")}` : ""].filter(Boolean).join("; ")}</li>`; }).join("");
     const ahead = s.day > s.through ? ` Every PHC has reported up to day ${s.through}; a paper PHC has reported further.` : "";
     box.innerHTML = `<div><strong>Live feed: day ${s.day} of ${s.last}</strong><p>A simulated network, not a real one: ${m.facilities.length} made-up PHCs in ${new Set(m.facilities.map((f) => f.st)).size} made-up states, played forward by the simulator. No real PHC is connected. Each PHC’s day arrives as one message: its diagnoses, dispensing slips, register balances, admissions and attendance. ${s.reported} of ${s.phcs} PHCs ${s.reported === 1 ? "has" : "have"} reported day ${s.day}${s.seconds === null ? "" : `, and their estimates were updated ${s.seconds} seconds after the reports were sent`}.${ahead}${via}</p>${log ? `<ul class="feed-log" aria-label="Latest changes">${log}</ul>` : ""}</div>
-      <div class="context-actions"><button type="button" class="button" id="jumpFeed"${s.through >= s.last ? " disabled" : ""}>Jump 10 days</button><button type="button" class="button" id="paperDay">Add a paper PHC’s day</button><span id="restartBox"><button type="button" class="button" id="restartFeed">Restart feed</button></span>
-        <span class="tag post">Paper PHC: added after the 30 Sep submission</span></div>`;
+      <div class="context-actions"><button type="button" class="button" id="jumpFeed"${s.through >= s.last ? " disabled" : ""}>Jump 10 days</button><button type="button" class="button" id="paperDay">Add a paper PHC’s day</button><span id="restartBox"><button type="button" class="button" id="restartFeed">Restart feed</button></span></div>`;
   }
 }
 
@@ -1458,7 +1503,6 @@ async function init() {   // the first load, and every change of network
     $("#play span").textContent = playLabel(false);
     $("#replayLabel").textContent = meta.live ? "Simulated live feed" : meta.scenario?.whatif ? "What-if replay" : "Simulation replay";
     $("#mapTag").textContent = meta.real_sites ? "Real public PHC locations (OpenStreetMap); synthetic records" : "Synthetic PHC locations";
-    $("#mapPost").hidden = !meta.real_sites;
     $("#guideNote").textContent = `${meta.live ? `A simulated live feed of ${meta.days} days: the first ${meta.live.history} arrive at the start, the rest one day at a time.`
       : `A ${meta.scenario?.whatif ? "what-if" : meta.scenario ? "scripted" : "synthetic"} replay of ${meta.days} days.`} Turn on “Show what the simulator hid” to see the true shelves, beds and staff.`;
     // real sites carry their OpenStreetMap credit on every tab, not only under the map
@@ -1616,6 +1660,11 @@ const openPin = (e) => {   // a PHC on the map: its most urgent medicine
 };
 $("#ccMap").addEventListener("click", openPin);
 $("#ccMap").addEventListener("keydown", openPin);
+$("#ccMap").addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") mapHover(e.target.closest(".pin, .arc"), e); });
+$("#ccMap").addEventListener("pointerleave", () => mapHover(null));
+$("#ccMap").addEventListener("focusin", (e) => mapHover(e.target.closest(".pin")));
+$("#ccMap").addEventListener("focusout", () => mapHover(null));
+DARK.addEventListener("change", () => mapArgs && renderMap(...mapArgs));   // the tiles follow the theme
 $("#stack").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) openService(b.dataset.chip); });
 $("#closeSvc").addEventListener("click", () => $("#svc").close());
 $("#svc").addEventListener("close", () => $(`#stack .chip[data-chip="${CSS.escape($("#svc").dataset.chip || "")}"]`)?.focus());

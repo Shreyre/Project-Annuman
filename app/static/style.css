@@ -220,12 +220,6 @@ h1 { font-size: 1.875rem; line-height: 1.15; font-weight: 680; font-stretch: 104
 .who { margin-top: 6px; font-size: 1rem; font-weight: 550; }
 #pageDescription { margin-top: 2px; color: var(--muted); font-size: 1rem; }
 #pageDescription:empty { display: none; }
-/* work added after the 30 Sep submission says so wherever it shows */
-.post-note { margin-top: 6px; color: var(--muted); font-size: .8125rem; }
-.tag.post { margin-right: 4px; background: var(--scarce-soft); color: var(--scarce-text); font-size: .75rem; white-space: normal; }
-h1 .tag.post, h3 .tag.post { margin-left: 6px; vertical-align: 1px; font-weight: 600; }
-h1 .tag.post { vertical-align: 6px; letter-spacing: 0; font-stretch: 100%; }
-.scope .tag.post, .stack-row .tag.post, .map-tags .tag.post { flex: none; margin: 0; }
 .story dd small { display: block; color: var(--muted); font-size: .75rem; font-weight: 500; }
 /* the Google services behind the page: a chip each, its status in words, the detail in a dialog */
 .stack-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 20px; }
@@ -337,12 +331,23 @@ h1 .tag.post { vertical-align: 6px; letter-spacing: 0; font-stretch: 100%; }
 #mapHatch .gap { fill: rgb(255 255 255 / .78); }
 .map .dim { opacity: .4; }
 .map .pin:focus-visible { outline: none; }
-.map .pin:focus-visible circle { stroke: var(--focus); stroke-width: 3; }
+.map .pin:focus-visible .dot { stroke: var(--focus); stroke-width: 3; }
+.map .dot, .map .ring { transform-box: fill-box; transform-origin: center; }
+.map .pin .ring { fill: none; stroke: var(--out); stroke-width: 2; opacity: 0; }   /* pulses where a shelf is empty, only with motion on */
 .map text { fill: var(--ink); font-size: 11.5px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.map .tiles { pointer-events: none; }
+.map-credit { margin: 0; padding: 2px 8px; text-align: right; color: var(--muted); font-size: .6875rem; }
+.map-credit a { color: inherit; }
+.map .arc { transition: opacity .2s ease; }
 .map .arc path { fill: none; stroke: var(--carbon); stroke-width: 2; opacity: .8; }
+.map .arc .flow { stroke: none; }
+.map .arc .hit { stroke: transparent; stroke-width: 14; }   /* a thin arrow is hard to point at */
+.map.focusing .arc:not(.hot) { opacity: .15; }
+.map.focusing .arc.hot .line { stroke-width: 3; opacity: 1; }
 .map marker path { fill: var(--carbon); }
 .map .arc rect { fill: var(--surface); stroke: var(--carbon); stroke-width: 1; }
 .map .arc text { fill: var(--carbon); font-size: 11px; font-weight: 700; stroke: none; text-anchor: middle; }
+.tip small { opacity: .75; }
 .map-key { border-top: 1px solid var(--rule); }
 .arc-key { width: 18px; border-top: 2px solid var(--carbon); }
 .map-note { margin: 0; padding: 10px 20px 16px; font-size: .8125rem; }
@@ -817,6 +822,17 @@ dialog .ik-actions .button { width: auto; margin-top: 0; }
   .toast:not([hidden]) { animation: toast-in .3s var(--ease); }
   .tip:not([hidden]) { animation: fade .12s ease-out; }
   dialog[open] { animation: rise .3s var(--ease); }
+
+  /* the map: a new district settles in, pins first, then its routes draw; supply keeps moving along them */
+  .map.enter .tiles { animation: fade .6s ease backwards; }
+  .map.enter .dot { animation: cell-in .45s var(--ease) backwards; animation-delay: calc(var(--i) * 45ms + .15s); }
+  .map.enter .pin text { animation: fade .3s ease backwards; animation-delay: calc(var(--i) * 45ms + .35s); }
+  .map.enter .arc .line { stroke-dasharray: 1; animation: draw .8s var(--ease) .5s backwards; }
+  .map.enter .arc rect, .map.enter .arc text { animation: fade .3s ease 1.2s backwards; }
+  .map .arc .flow { stroke: var(--carbon-strong); stroke-width: 4; stroke-linecap: round; stroke-dasharray: .03 .97; opacity: 1; animation: draw 2.4s linear infinite; }
+  .map .pin .ring { animation: ring 2s ease-out infinite; }
+  .map .pin[tabindex] .dot { transition: transform .15s var(--ease); }
+  .map .pin[tabindex]:hover .dot, .map .pin:focus-visible .dot { transform: scale(1.35); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -833,3 +849,4 @@ dialog .ik-actions .button { width: auto; margin-top: 0; }
 @keyframes pop { from { opacity: 0; transform: scale(.9); } }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 @keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes ring { from { opacity: .8; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }

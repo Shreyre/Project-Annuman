@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,300..800&family=Anek+Odia:wght@500;600&family=Kalam:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body class="intro">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -59,15 +59,13 @@
   </section>
 
   <div class="page-heading">
-    <div><h1 id="pageTitle">District command center</h1><p class="who">For district health officers: finds medicines that have run out even when the stock register says they haven’t</p><p id="pageDescription"></p>
-      <p class="post-note"><span class="tag post">Demo-day build</span> It adds work done after the 30 Sep 2026 submission (commit 1d51118); the README’s “After the submission” lists what.</p></div>
+    <div><h1 id="pageTitle">District command center</h1><p class="who">For district health officers: finds medicines that have run out even when the stock register says they haven’t</p><p id="pageDescription"></p></div>
     <div class="scope">
       <div id="netSwitch" class="segmented" role="group" aria-label="Network"><button type="button" data-net="demo" aria-pressed="true">Demo network</button><button type="button" data-net="kerala" aria-pressed="false">Kerala replay</button><button type="button" data-net="live" aria-pressed="false">Live feed</button><button type="button" data-net="whatif" aria-pressed="false" aria-haspopup="dialog">What if…</button></div>
       <span id="networkSize" class="scope-label">Connecting to the network…</span>
-      <span class="tag post">What if…: added after the 30 Sep submission</span>
     </div>
   </div>
-  <div class="stack-row"><span id="stackLabel" class="stack-label">Built with Google</span><span class="tag post">Added after the 30 Sep submission</span><ul id="stack" class="stack" aria-labelledby="stackLabel"></ul></div>
+  <div class="stack-row"><span id="stackLabel" class="stack-label">Built with Google</span><ul id="stack" class="stack" aria-labelledby="stackLabel"></ul></div>
   <div id="loadError" class="error-banner" role="alert" hidden><span></span><button id="retry" class="button" type="button">Try again</button></div>
   <div id="context" class="context" hidden></div>
 
@@ -81,7 +79,7 @@
         <div id="ccBody" aria-busy="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       </section>
       <section class="panel cc-map" aria-labelledby="mapTitle">
-        <div class="panel-heading"><div><h2 id="mapTitle">Map</h2><p>PHCs by shelf status; arrows are today’s transfers in.</p></div><span class="map-tags"><span id="mapTag" class="tag">Synthetic PHC locations</span><span id="mapPost" class="tag post" hidden>Added after the 30 Sep submission</span></span></div>
+        <div class="panel-heading"><div><h2 id="mapTitle">Map</h2><p>PHCs by shelf status; arrows are today’s transfers in.</p></div><span class="map-tags"><span id="mapTag" class="tag">Synthetic PHC locations</span></span></div>
         <div id="ccMap" class="map-body"><div class="skeleton"></div></div>
       </section>
     </div>
@@ -139,7 +137,7 @@
     <p class="section-note">Diagnoses and slips stay inside each state. Only district and medicine counts are shared, and any group of fewer than five PHCs is suppressed.</p>
     <div id="national" class="rail-body"></div>
     <section class="rail-body rollout" aria-labelledby="rolloutTitle">
-      <h3 id="rolloutTitle">Rolling it out <span class="tag post">Added after the 30 Sep submission</span></h3>
+      <h3 id="rolloutTitle">Rolling it out</h3>
       <ul class="rollout-grid">
         <li><strong>One command per state</strong><span>A state joins the national view with one command, <code>cleanroom onboard &lt;state&gt;</code>, run in its own Google Cloud project. Its care records stay there; only the counts above are shared.</span></li>
         <li><strong>About $1.7 a month in total, for all of India’s PHCs</strong><span>Nightly compute for all 31,882 PHCs (MoHFW, 2023) and 25 tracer medicines: about 52 vCPU-minutes a night on Cloud Run. Compute only: taking in the feeds, storage and serving are not counted.</span></li>
@@ -154,7 +152,7 @@
     <p class="section-note">Scored against the simulator’s hidden ground truth on a held-out seed. A catch is an alarm up to three weeks before the shelf empties. Not yet validated on real patient data.</p>
     <div class="rail-body"><p id="takeaway" class="takeaway"></p><div class="scroll"><table id="proof" class="data proof"></table></div><p id="dayNote" class="note"></p><p id="triageNote" class="note"></p><p id="bench" class="note bench" hidden></p>
       <div id="real" hidden><h3>A first check on real data</h3><div id="realBody"></div></div>
-      <div id="india" hidden><h3>A first check on Indian data (HMIS, district-month) <span class="tag post">Added after the 30 Sep submission</span></h3><div id="indiaBody"></div></div></div>
+      <div id="india" hidden><h3>A first check on Indian data (HMIS, district-month)</h3><div id="indiaBody"></div></div></div>
   </section>
 
   <footer class="foot"><span class="footer-brand">Anumaan is a synthetic replay, not a live clinical or inventory system.</span><p id="grammarNote"></p></footer>
@@ -180,7 +178,7 @@
 <dialog id="whatif" class="form-dialog" aria-labelledby="whatifTitle">
   <div class="dialog-heading"><span class="dialog-kicker">What if…</span><button id="closeWhatif" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <h2 id="whatifTitle">Play out an event, and see when Anumaan calls it</h2>
-  <p class="label-line"><span class="tag">What-if on synthetic records: not a forecast and not a test set</span> <span class="tag post">Added after the 30 Sep submission</span></p>
+  <p class="label-line"><span class="tag">What-if on synthetic records: not a forecast and not a test set</span></p>
   <p>Pick an event. The simulator plays it out on a synthetic network, and Anumaan reads that network as it reads any other: day by day, from the care recorded.</p>
   <div id="whatifPicks" hidden><h3>Ready-made</h3><ul id="whatifMenu" class="wi-menu"></ul></div>
   <form id="whatifForm" class="wi-form" hidden>
@@ -201,7 +199,6 @@
 <dialog id="intake" class="form-dialog wide" aria-labelledby="intakeTitle">
   <div class="dialog-heading"><span class="dialog-kicker">Paper PHC</span><button id="closeIntake" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <h2 id="intakeTitle">Add a day from a paper PHC’s registers</h2>
-  <p class="label-line"><span class="tag post">Added after the 30 Sep submission</span></p>
   <p>A PHC with no computer can still be read. Photograph one day’s OPD register and dispensing register. Gemini reads the pages into the same report a digital PHC sends, and you check it line by line.</p>
   <p class="apply-note"><strong>Nothing is applied until you confirm.</strong></p>
   <p class="note">Read test on 8 held-out synthetic PHC-days: Gemini read 650 of 650 register lines right and missed no row. The pages were drawn in a handwriting font, not photographed from real registers; real registers are not tested yet.</p>
@@ -209,6 +206,6 @@
   <div id="intakeBody"></div>
 </dialog>
 <div id="tip" class="tip" aria-hidden="true" hidden></div><div id="toast" class="toast" role="status" hidden></div>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

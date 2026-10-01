@@ -10,7 +10,7 @@ import pytest
 
 from anumaan import crg as G, scenario, sim, triage, whatif
 
-# sha256 of each world's records on the submitted code (1d51118), taken before sim.simulate had surges
+# sha256 of each world's records on commit 1d51118, taken before sim.simulate had surges
 BEFORE = dict(seed5="db32a838de74363fce6cc18bc43f8c67e84be834f7b45cab5461b41a3eb26625",
               seed0="14e6e1957482094f2f6ba661146729aed68195fe8aa921a25173ea35446008b7",
               kerala="14fcf8b6e6fc42d90e124d02e7aea6039575941001f1c7d479c75d490aa99f6a",
