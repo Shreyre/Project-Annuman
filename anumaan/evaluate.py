@@ -111,7 +111,7 @@ def evaluate(run):
     model = methods["model"]
     onsets = [(f, d, s) for (f, d), segs in model.items() for s, _ in segs]
     fill = triage.fill_rate(run.wh_asked, run.wh_got, run.wh_posted)
-    lift = triage.surge_lift(obs["N"], run.st)
+    lift, dlift = triage.surge_lift(obs["N"], run.st), triage.surge_lift(obs["N"], run.wh)
     caught = [(e, (e["fac"], e["drug"], min(h))) for e in events if (h := _hits(model, e))]
     first = {}
     for e, o in caught:
@@ -122,7 +122,7 @@ def evaluate(run):
     res["triage_majority"] = max(counts.values()) / len(caught) if caught else float("nan")
     for settle in (7, 21):
         labels = dict(zip(onsets, triage.classify(onsets, run.wh, run.st, fill, lift,
-                                                  [s + 1 + settle for _, _, s in onsets])))
+                                                  [s + 1 + settle for _, _, s in onsets], dlift)))
         pairs = [(e["type"], labels[o]) for e, o in caught]
         res[f"triage_{settle}d"] = dict(
             accuracy=float(np.mean([a == b for a, b in pairs])) if pairs else float("nan"),

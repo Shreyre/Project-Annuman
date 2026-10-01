@@ -193,7 +193,8 @@ def alarms_on(run, obs, series, t, start):
     where it broke from the ledger up to day t."""
     live = [(f, d, s) for (f, d), (_, _, segs) in series.items() for s, e in segs if s + 1 <= t < e]
     fill = triage.fill_rate(run.wh_asked, run.wh_got, run.wh_posted)
-    labels = triage.classify(live, run.wh, run.st, fill, triage.surge_lift(obs["N"], run.st), t)
+    labels = triage.classify(live, run.wh, run.st, fill, triage.surge_lift(obs["N"], run.st), t,
+                             triage.surge_lift(obs["N"], run.wh))
     rows = []
     for (f, d, s), level in zip(live, labels):
         post, cover, _ = series[(f, d)]
@@ -291,6 +292,8 @@ def absorb(m, run, obs, care=None, start=START, skip=None):
     """Write one stream message into run, the aggregated care record obs (crg.aggregate's
     output) and care's bed and staff feeds. Everything is checked before anything is written,
     and nothing is if skip(kind, day, index) says so (a report the caller already has).
+    A PHC message with no "stock" (a paper register read by anumaan.intake) keeps the day
+    before's balances; "received" is taken like "receipts".
     Returns (kind, day, PHC or warehouse index); ValueError on anything it cannot place."""
     ix, T, where = run.ix, len(run.book), "message"
     try:
@@ -321,7 +324,7 @@ def absorb(m, run, obs, care=None, start=START, skip=None):
         slips = [(0, 0, cond(c), drug(d), int(dot), float(u)) for c, d, dot, u in m.get("slips", ())]
         na = [(0, 0, cond(c), drug(d)) for c, d in m.get("not_available", ())]
         stock = [(drug(d), float(b)) for d, b in m.get("stock", {}).items()]
-        rec = [(drug(d), float(u)) for d, u in m.get("receipts", {}).items()]
+        rec = [(drug(d), float(u)) for k in ("receipts", "received") for d, u in m.get(k, {}).items()]
         if care is not None and "attendance" in m:
             att = [(idx(CARE.CADRES, k, "cadre"), bool(v[0]), int(v[1]), int(v[2])) for k, v in m["attendance"].items()]
             admits = [(t, f, s, str(kind)) for s, kind in m.get("admissions", ())]
@@ -335,6 +338,8 @@ def absorb(m, run, obs, care=None, start=START, skip=None):
         obs[k][t, f] = v[0, 0]
     run.slips.extend((t, f, c, d, dot, u) for _, _, c, d, dot, u in slips)      # raw rows stay in the state
     run.na.extend((t, f, c, d) for _, _, c, d in na)
+    if "stock" not in m and t > 0:
+        run.book[t, f] = run.book[t - 1, f]
     for d, b in stock:
         run.book[t, f, d] = b
     for d, u in rec:

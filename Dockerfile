@@ -9,5 +9,7 @@ RUN pip install --no-cache-dir numpy==2.4.3 fastapi==0.135.1 uvicorn==0.41.0 pyd
 COPY anumaan/ anumaan/
 COPY app/ app/
 COPY grammar/ grammar/
+# the paper intake's SYNTHETIC sample pages (/samples); nothing else from tools/
+COPY tools/samples/ tools/samples/
 USER nobody
 CMD exec uvicorn app.main:app --host 0.0.0.0 --port $PORT

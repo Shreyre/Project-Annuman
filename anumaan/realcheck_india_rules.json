@@ -1,0 +1,77 @@
+{
+ "name": "realcheck_india: a pre-registered premise check on India's public HMIS district-month data",
+ "written_at": "2026-09-30T20:18:34Z",
+ "note": "These rules were written before any outcome was computed. When this file was written its author had not computed any care ratio (1.2.4/1.1, 1.2.5/1.1) or care count (9.9, 9.10) against any ledger marker, on any copy of the data. They transcribe the design in the project notes of 1 October 2026 ('B3. The smallest honest premise check: realcheck_india v0'). Where that design left a case open, the text says 'clarified': each clarification was made here, before looking. Known exposure, disclosed in the results: the project notes also hold a crude feasibility probe that another agent ran, before B3 was written, on a third-party parsed copy of the same HMIS files. This file is never edited once computing starts. A gap found later goes into the 'amendments' list of anumaan/realcheck_india.json, with its reason and time. anumaan/realcheck_india.py reads its parameters from 'params' below, and the results record this file's SHA-256, taken over its bytes with LF line endings.",
+ "question": "When a district's own HMIS store ledger records no adult IFA tablets in a month, does the same district's care record show the 'full courses stop' fingerprint more often than in months when the ledger shows plenty? The fingerprint is fewer pregnant women given the full 180-tablet IFA course (item 1.2.4) per woman registered for antenatal care (item 1.1).",
+ "why_this_pair": "Item 1.2.4 counts full courses given, which is Anumaan's 'full course' observation. Item 1.1 is the denominator: the women who need the course. Item 19.6 is a separate register of the same medicine.",
+ "data": {
+  "source": "HMIS (Health Management Information System), Ministry of Health and Family Welfare. Standard Reports, 'C2. Data Itemwise Monthly (up to sub district)', '3. All States and Districts Across Months': one public zip per financial year.",
+  "url_pattern": "https://hmis.mohfw.gov.in/downloadfiles?filepath=/Standard%20Reports/5~C2.%20Data%20Itemwise%20Monthly%20(up%20to%20sub%20district)/3.%20All%20States%20and%20Districts%20Across%20Months/{fy}.zip",
+  "years": "v0: FY 2019-20. v1: FY 2017-18, 2018-19 and 2019-20. FY 2020-21 (COVID, provisional) is left out.",
+  "files": "Each zip holds one SAS-HTML table per state or UT, saved as .xls (cp1252). The whole-country file All_India and the files 'M O Defence' and 'M O Railways' are left out (clarified): they are not districts.",
+  "values": "For each district and month, the 'Total [(A+B) or (C+D)]' sub-column, the first of the five per month; ledger fields use the same column. A blank cell is missing. Values are used as printed, negatives included (clarified).",
+  "district": "A district is its state file's name plus the district name as printed. Names are matched exactly across years, never fuzzily (clarified).",
+  "items": {
+   "1.1": "Total number of pregnant women registered for ANC",
+   "1.2.4": "Number of PW given 180 Iron Folic Acid (IFA) tablets",
+   "1.2.5": "Number of PW given 360 Calcium tablets",
+   "9.9": "Number of children (6-59 months) provided 8-10 doses (1ml) of IFA syrup (Bi weekly)",
+   "9.10": "Number of children (12-59 months) provided Albendazole",
+   "19.6": "IFA tablets ( Adult)",
+   "19.9": "IFA Syrup (Paediatric)",
+   "19.15": "Albendazole 400 mg tablet",
+   "19.16": "Calcium Tablets"
+  },
+  "item_names_note": "Names as printed in FY 2019-20. Items are taken by code; the names seen in each year are recorded in the results, and a change of meaning would be an amendment (clarified).",
+  "ledger_fields": ["1. Balance From Previous Month", "2. Stocks Received", "3. Unusable Stock", "4. Stock Distributed", "5. Total Stock"]
+ },
+ "rules": {
+  "1_series": "A series is one district in one financial year: 12 months, April to March. A ledger is in use in a series when all five of its fields are reported (non-blank) in all 12 months and its 'Stock Distributed' is above zero in at least 6 of the 12. Only series whose analysis ledger is in use are scored (19.6 for the primary).",
+  "2_empty": "A month is EMPTY when the ledger's 'Balance From Previous Month' + 'Stocks Received' = 0, and the previous month's 'Total Stock' is reported and = 0, so the zero continues in the ledger rather than being a blank. The previous month is the calendar month before, for the same district; for April it comes from the previous year's file (clarified). An April with no previous month in the analysed files is never EMPTY: v0 drops April 2019, and v1 drops April 2017.",
+  "3_stocked": "A month is STOCKED when 'Balance From Previous Month' + 'Stocks Received' is at least 2 x the series' median monthly 'Stock Distributed' (the median of its 12 months). Months that are neither EMPTY nor STOCKED are not used.",
+  "4_gap_guard": "Data-entry gap guard: a month is dropped if item 1.1 is blank, zero, or below 50% of the series' median of item 1.1 (the median over its non-blank months). A dropped month is neither scored nor part of any reference. A month whose score cannot be formed, because its care item is blank, is dropped the same way (clarified). The guard applies to every analysis below, placebos and secondaries included (clarified).",
+  "5_score": "y = item 1.2.4 / item 1.1. Each month gets a robust z = (y - median) / (1.4826 x MAD) against the series' STOCKED months that survive the gap guard (the reference). The MAD is floored at 0.01 absolute, the same as realcheck.py's floor for shares. STOCKED months are scored leave-one-out, against the other STOCKED months; every other month is scored against all of them. A series needs at least 4 STOCKED months, counted after the gap guard (clarified), or it is not scored.",
+  "6_flag": "A month is flagged when z <= -3.",
+  "7_statistic": "p_E = share of scored EMPTY months flagged; p_S = share of scored STOCKED months flagged. Both are pooled over every scored series, so p_S includes series with no EMPTY month (clarified). Rate ratio RR = p_E / p_S, with a 95% CI from a bootstrap over districts: 2,000 resamples, seed 0.",
+  "7_bootstrap": "Clarified. The districts with at least one scored series, sorted by state and then district, are resampled with replacement: numpy.random.default_rng(0).integers(0, n, (2000, n)). A drawn district brings all its scored series. Each resample's RR is its pooled p_E / p_S. A resample with no EMPTY month, or with p_E = p_S = 0, has no RR and is dropped, and the number dropped is reported; p_S = 0 < p_E gives RR = infinity. The CI is numpy.percentile(RRs, [2.5, 97.5], method='nearest'). Each analysis, in v0 and in v1, draws from its own fresh generator seeded 0.",
+  "8_decision": "Support: at least 30 scored EMPTY months, from at least 10 districts in at least 5 states, RR >= 3, and the CI's lower bound above 1. Refutation: the CI's upper bound below 2, or p_E <= p_S. Otherwise inconclusive. Support is checked first, then refutation; with no scored EMPTY month the result is inconclusive (clarified). The rule is applied to v0 and to v1 separately and both are reported. The headline is v1, which holds v0's data and two more years; if the two disagree, the headline says so (clarified). The result is published either way.",
+  "9a_placebo_calcium": "Calcium, a different medicine given at the same visits. The score is y = item 1.2.5 / item 1.1, under the primary's rules, keeping only months in which the calcium ledger (19.16), also in use in the series, is STOCKED. So its EMPTY months are IFA-EMPTY and calcium-STOCKED, and its STOCKED months, which are also the reference, are IFA-STOCKED and calcium-STOCKED (clarified). RR should be about 1. If it rises like IFA's, the flags are reporting dropouts.",
+  "9b_placebo_timing": "Timing: each EMPTY month's marker (rules 1-2) is moved 6 months later, to the same district's month 6 calendar months on, and kept only where that month is a scored STOCKED month. p_E is the share of those months flagged under the primary's scoring; p_S is the primary's. In v1 the shifted month may fall in the next year's series; a shift past March 2020 is dropped (clarified). RR should be about 1.",
+  "9_placebo_reading": "Clarified. A placebo 'fires' when its RR >= 3 and its CI's lower bound is above 1 (the support thresholds, without the count minimums). It is 'quiet' when its CI's lower bound is 1 or less, and 'raised' otherwise. If the primary is supported and a placebo fires, the headline must say the fingerprint is not specific to IFA stock: reporting dropouts or a general disruption could explain it.",
+  "10_secondary": "Outside the decision. Each is reported with its p_E, p_S, RR and CI and the label the decision rule would give it, on v0 and v1. (i) A one-month lag: the primary's markers, with the care month one month later for both groups. p_E is taken over the months after EMPTY months and p_S over the months after STOCKED months, counting each such month that is itself scored under the primary's scoring (clarified: both groups are lagged). (ii) Replication, IFA syrup: item 9.9 against ledger 19.9, the score a raw count with the MAD floored at 1% of the reference median, otherwise the primary's rules, gap guard on item 1.1 included. (iii) Replication, albendazole: item 9.10 against ledger 19.15, scored like the IFA syrup replication (clarified: raw count, 1% floor).",
+  "11_exploratory": "Nothing else enters the headline. Anything else computed later is labelled exploratory."
+ },
+ "if_supported": "In Indian routine records, district-wide stock-outs recorded in the register coincide with fewer full courses of that medicine per patient who needed it, but not of an unrelated medicine given at the same visits.",
+ "limits": [
+  "Not the filter: there is nothing per PHC per day.",
+  "Not hidden stock-outs: the marker is the register itself, and Anumaan's claim is that care reveals what the register hides. This check can only show that stock-outs the register records leave the fingerprint.",
+  "Nothing below the district: EMPTY means every reporting store in the district had none.",
+  "Not independent records: the ledger and the care counts come from the same monthly form and the same staff. The gap guard and the calcium placebo cover this only partly.",
+  "Not representative: only districts whose ledger is in use count (110 of 704 for IFA in FY 2019-20, by the project notes).",
+  "A refutation would not settle it: IFA handed out from stores outside the ledger (sub-centres, ASHAs) would dilute the fingerprint, so a refutation would not settle the question for PHC dispensing.",
+  "Trend: Anemia Mukt Bharat scaled IFA up from 2018, and the baselines have no trend term."
+ ],
+ "params": {
+  "years": {"v0": ["2019-2020"], "v1": ["2017-2018", "2018-2019", "2019-2020"]},
+  "headline": "v1",
+  "exclude_files": ["All_India", "M O Defence", "M O Railways"],
+  "in_use_min_months_distributed": 6,
+  "stocked_multiple": 2,
+  "gap_guard_item": "1.1",
+  "gap_guard_share_of_median": 0.5,
+  "mad_scale": 1.4826,
+  "flag_z_at_or_below": -3,
+  "min_stocked_months": 4,
+  "bootstrap": {"resamples": 2000, "seed": 0, "percentiles": [2.5, 97.5], "method": "nearest"},
+  "decision": {"min_empty_months": 30, "min_districts": 10, "min_states": 5, "support_rr": 3, "support_ci_lower_above": 1, "refute_ci_upper_below": 2},
+  "placebo_fires": {"rr": 3, "ci_lower_above": 1},
+  "analyses": {
+   "primary": {"role": "decision", "ledger": "19.6", "num": "1.2.4", "den": "1.1", "floor": 0.01, "floor_relative": false},
+   "placebo_calcium": {"role": "placebo", "ledger": "19.6", "also_stocked": "19.16", "num": "1.2.5", "den": "1.1", "floor": 0.01, "floor_relative": false},
+   "placebo_timing": {"role": "placebo", "ledger": "19.6", "num": "1.2.4", "den": "1.1", "floor": 0.01, "floor_relative": false, "marker_shift_months": 6},
+   "lag_one_month": {"role": "secondary", "ledger": "19.6", "num": "1.2.4", "den": "1.1", "floor": 0.01, "floor_relative": false, "outcome_lag_months": 1},
+   "ifa_syrup": {"role": "secondary", "ledger": "19.9", "num": "9.9", "den": null, "floor": 0.01, "floor_relative": true},
+   "albendazole": {"role": "secondary", "ledger": "19.15", "num": "9.10", "den": null, "floor": 0.01, "floor_relative": true}
+  }
+ }
+}

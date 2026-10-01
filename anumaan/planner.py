@@ -21,9 +21,10 @@ The match is a min-cost flow (Google OR-Tools): integer courses, arcs only withi
 max_minutes of road AND inside one state (DVDMS indents and procurement run per
 state; a cross-state loan is the STATE-PROCUREMENT escalation, not a routine issue),
 as much need covered as possible at the fewest minutes x courses.
-Coordinates are SYNTHETIC. Travel times are real Google Maps Routes drive times between those
-points where road_minutes.json holds the map (seeds 5-9, so the demo's seed 5 too), else a
-straight-line estimate. The app only reads that file; fetch_road_minutes fills it.
+Coordinates are SYNTHETIC, except the Kerala replay's 70 real public PHC/FHC sites from
+OpenStreetMap (kerala_phcs.json). Travel times are real Google Maps Routes drive times between
+those points where road_minutes.json holds the map (seeds 5-9, so the demo's seed 5 too, and the
+Kerala sites), else a straight-line estimate. The app only reads that file; fetch_road_minutes fills it.
 
     python -m anumaan.planner --seeds 5-9
     python -m anumaan.planner --seeds 5-9 --fetch-routes   # first fetch missing maps (billed)
@@ -131,10 +132,12 @@ def _arcs(o, ds, elements):
             for e in elements if e.get("condition") == "ROUTE_EXISTS" and not e.get("status", {}).get("code")]
 
 
-def fetch_road_minutes(seeds):
-    """Add real Google Maps road times for each seed's SYNTHETIC map to ROAD_MINUTES. Maps it
-    already holds are skipped, so a re-run costs nothing. Asks only for the arcs plan can use
-    (one state, never a PHC to itself) as Compute Route Matrix Essentials (DRIVE,
+def fetch_road_minutes(seeds=(), maps=None):
+    """Add real Google Maps road times to ROAD_MINUTES for each seed's SYNTHETIC map, and for each
+    named map in maps, {name: (coords [F, 2], same_state [F, F] bool)}: the Kerala replay's real
+    sites are {"kerala": (their lat/lon in kerala_phcs.json order, all True)}, 70 x 69 = 4,830
+    elements. Maps it already holds are skipped, so a re-run costs nothing. Asks only for the arcs
+    plan can use (one state, never a PHC to itself) as Compute Route Matrix Essentials (DRIVE,
     TRAFFIC_UNAWARE, no traffic or tolls): 2 states x 18 x 17 = 612 elements a default map. Needs
     application-default credentials and routes.googleapis.com on PROJECT. Offline tool: the app
     never calls it."""
@@ -144,29 +147,38 @@ def fetch_road_minutes(seeds):
     s = AuthorizedSession(creds)
     hdr = {"X-Goog-User-Project": PROJECT,
            "X-Goog-FieldMask": "originIndex,destinationIndex,duration,distanceMeters,status,condition"}
-    data = {"about": "SYNTHETIC points (planner.synthetic_coords), REAL road times between them: Google Maps "
-                     "Routes computeRouteMatrix, DRIVE, TRAFFIC_UNAWARE. arcs: [origin, destination, seconds, "
+    data = {"about": "REAL road times between each map's points: Google Maps Routes computeRouteMatrix, DRIVE, "
+                     "TRAFFIC_UNAWARE. A map named by a seed holds SYNTHETIC points (planner.synthetic_coords); "
+                     "'kerala' holds 70 real public PHC/FHC sites from OpenStreetMap (kerala_phcs.json, ODbL 1.0, "
+                     "(c) OpenStreetMap contributors), in that file's order. arcs: [origin, destination, seconds, "
                      "metres], same-state pairs only; a pair missing here gets the straight-line estimate. "
                      "Add maps: python -m anumaan.planner --seeds 5-9 --fetch-routes",
             "maps": json.loads(ROAD_MINUTES.read_text())["maps"] if ROAD_MINUTES.exists() else {}}
-    for seed in seeds:
-        run = sim.simulate(seed=seed)
-        coords, st = synthetic_coords(run, seed), np.array(run.st)
+    for name, (coords, same) in ({str(seed): _seed_map(seed) for seed in seeds} | (maps or {})).items():
+        coords = np.asarray(coords, float)
         if _road_arcs(coords) is not None:
             continue
-        want = (st[:, None] == st) & ~np.eye(len(st), dtype=bool)
+        want = np.asarray(same, bool) & ~np.eye(len(coords), dtype=bool)
         arcs = []
         for o, ds, body in route_matrix_requests(coords, want):
             while (r := s.post(ROUTES_URL, json=body, headers=hdr, timeout=60)).status_code == 429:
                 time.sleep(60)                          # Routes allows 3,000 matrix elements a minute
             r.raise_for_status()
             arcs += _arcs(o, ds, r.json())
+            time.sleep(len(ds) / 45)                    # so pace the asks to about 2,700 a minute
         n = int(want.sum())
-        data["maps"][str(seed)] = dict(fetched=date.today().isoformat(), elements=n, no_route=n - len(arcs),
-                                       coords=coords.tolist(), arcs=arcs)
+        data["maps"][name] = dict(fetched=date.today().isoformat(), elements=n, no_route=n - len(arcs),
+                                  coords=coords.tolist(), arcs=arcs)
         ROAD_MINUTES.write_text(json.dumps(data))       # after every map: nothing paid for is lost
         _road_maps.cache_clear()
-        print(f"seed {seed}: {n} elements asked, {n - len(arcs)} without a road route (straight line kept)")
+        print(f"map {name}: {n} elements asked, {n - len(arcs)} without a road route (straight line kept)")
+
+
+def _seed_map(seed):
+    """A seed's SYNTHETIC coordinates and same-state mask."""
+    run = sim.simulate(seed=seed)
+    st = np.array(run.st)
+    return synthetic_coords(run, seed), st[:, None] == st
 
 
 def labels_at(t, run, post, obs, cover=None):
@@ -178,7 +190,8 @@ def labels_at(t, run, post, obs, cover=None):
             for k, p in post.items()}
     known = [(f, d, s) for (f, d), ss in segs.items() for s, _ in ss]
     fill = triage.fill_rate(run.wh_asked, run.wh_got, run.wh_posted)
-    lab = dict(zip(known, triage.classify(known, run.wh, run.st, fill, triage.surge_lift(obs["N"], run.st), t)))
+    lab = dict(zip(known, triage.classify(known, run.wh, run.st, fill, triage.surge_lift(obs["N"], run.st), t,
+                                          triage.surge_lift(obs["N"], run.wh))))
     return {(f, d): lab[(f, d, ss[-1][0])] if ss and ss[-1][1] == t + 1 else None for (f, d), ss in segs.items()}
 
 

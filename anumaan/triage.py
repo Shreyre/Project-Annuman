@@ -6,8 +6,8 @@ indents for a drug, the break is at or above that warehouse, even while its
 30-90 days of buffer still hide it from the PHCs. One warehouse starved is a
 WAREHOUSE failure; a third of a state's warehouses (and at least 2) is STATE-PROCUREMENT;
 that in each of 2+ states is NATIONAL. If supply kept flowing, the alarm is a DEMAND-SURGE when the state's
-diagnoses for the drug run well above its warm-up (the fix is a bigger indent, not
-an audit), else LOCAL: something at the PHC itself.
+diagnoses for the drug run well above its warm-up, or its own district's run at twice theirs (the fix
+is a bigger indent, not an audit), else LOCAL: something at the PHC itself.
 """
 from collections import Counter
 
@@ -26,6 +26,20 @@ STARVED = 0.3     # a warehouse got under 30% of what it indented...
 LAG, WIN = 10, 28  # ...over the indents placed 10-38 days ago (receipts post up to 10 days late)
 LOOK = 7          # a warehouse starved up to a week before an alarm still explains it
 SURGE, SURGE_DAYS = 1.2, 7   # the state's expected courses over 7 days, 20%+ over its warm-up
+# ...or the district's own, doubled: one district's outbreak barely moves a 14-district state's pooled lift.
+# Chosen on seeds 0-4. Warehouse x medicine x days (day 30+) where the district reaches the threshold but
+# the state stays under SURGE, in worlds with no district outbreak: each a DEMAND-SURGE only this rule adds.
+#   threshold                        1.4               1.5            1.6            1.7-2.5
+#   demo network, per seed           6,1,4,1,8         0,0,0,0,3      0              0      (of 7,140)
+#   ...alt behaviour                 0,0,12,10,4       0,0,3,0,0      0              0
+#   ...indents filled 5-30%          5,4,5,0,18        0,0,1,0,3      0              0
+#   14 districts x 5 PHCs            23,20,39,8,8      3,0,12,2,0     1,0,2,0,0      0      (of 11,760)
+#   ...the Kerala background only    10,7,7,12,7       0,0,1,0,0      0              0
+# A fever+diarrhoea outbreak at x2 from day 60 (5 seeds x 3 districts) is seen a median 3 days in at 1.7 and
+# 5 at 2.0 (x3: 1 and 2). 2.0, not the lowest clean 1.7, leaves a margin for real diagnoses' extra noise.
+# Held out, seeds 5-9: 2.0 adds none in any of these worlds (1.6 adds 3, in one), and no number in
+# anumaan.evaluate's tables moves.
+DISTRICT = 2.0
 
 
 def wide(n_starved, n_warehouses):
@@ -56,7 +70,8 @@ def starved(fill, lo, hi):
 
 def surge_lift(N, st, warmup=30, k=SURGE_DAYS):
     """[T, F, D]: expected courses (diagnoses x CRG) over the last k days, pooled over each
-    PHC's state, against the state's warm-up mean. N: [T, F, D] from crg.aggregate."""
+    PHC's state, against the state's warm-up mean. N: [T, F, D] from crg.aggregate.
+    Given warehouse ids for st, the same pooled over each PHC's district (classify's dlift)."""
     st, lift = np.asarray(st), np.empty(N.shape)
     for s in set(st.tolist()):
         c = np.cumsum(N[:, st == s].sum(1), 0)                       # [T, D]
@@ -65,11 +80,12 @@ def surge_lift(N, st, warmup=30, k=SURGE_DAYS):
     return lift
 
 
-def classify(onsets, wh, st, fill, lift, asof):
+def classify(onsets, wh, st, fill, lift, asof, dlift=None):
     """Label each alarm onset (fac, drug, day) from the ledger and diagnoses up to day asof
     (one day for all, or one per onset; at least the day after the onset, when an alarm is
     confirmed). wh / st: warehouse / state id per facility; fill: fill_rate, warehouses in
-    sorted order; lift: surge_lift."""
+    sorted order; lift: surge_lift; dlift: surge_lift(N, wh), for the district rule (none
+    without it)."""
     whs = sorted(set(wh))
     w_of, st_of = [whs.index(w) for w in wh], [dict(zip(wh, st))[w] for w in whs]
     last, n_wh = len(fill) - 1, Counter(st_of)
@@ -83,7 +99,7 @@ def classify(onsets, wh, st, fill, lift, asof):
             labels.append("STATE-PROCUREMENT")
         elif w_of[f] in hit:
             labels.append("WAREHOUSE")
-        elif lift[min(t + 1, last), f, d] >= SURGE:
+        elif lift[min(t + 1, last), f, d] >= SURGE or (dlift is not None and dlift[min(t + 1, last), f, d] >= DISTRICT):
             labels.append("DEMAND-SURGE")
         else:
             labels.append("LOCAL")
